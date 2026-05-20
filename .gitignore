@@ -1,0 +1,15 @@
+# credentials
+.env
+.env.staging
+.env.prod
+.mcp.json
+
+# generated artifacts
+reports/
+tests/generated/
+test-results/
+playwright-report/
+context-cache/*.md
+
+# node
+node_modules/

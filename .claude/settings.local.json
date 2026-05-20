@@ -1,0 +1,24 @@
+{
+  "permissions": {
+    "allow": [
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "WebFetch(domain:github.com)",
+      "PowerShell(npx skills@latest add mattpocock/skills/caveman --yes)",
+      "PowerShell(Get-ChildItem -Path \"$env:USERPROFILE\" -Force -ErrorAction SilentlyContinue | Select-Object Name, Attributes | Sort-Object Name | Where-Object { $_.Name -match \"claude|agent\" })",
+      "PowerShell($p = \"$env:USERPROFILE\"; Write-Host \"Profile: $p\"; Get-ChildItem -Path $p -Force -ErrorAction SilentlyContinue | Select-Object -First 30 | Format-Table Name, Attributes -AutoSize)",
+      "PowerShell(cmd /c \"dir /a /s C:\\\\Users\\\\xx228\\\\.agents 2>&1 | head -50\")",
+      "PowerShell(cmd /c \"dir /a /s C:\\\\Users\\\\xx228\\\\.agents 2>&1\")",
+      "PowerShell(npx skills@latest add mattpocock/skills/caveman --yes --global)",
+      "PowerShell(New-Item -ItemType Directory -Force -Path \"C:\\\\Users\\\\xx228\\\\Downloads\\\\qa-engine-v2_1\\\\qa-engine\\\\reports\\\\screenshots\")",
+      "mcp__playwright__browser_navigate",
+      "mcp__playwright__browser_snapshot",
+      "mcp__playwright__browser_type",
+      "mcp__playwright__browser_click",
+      "mcp__playwright__browser_evaluate",
+      "mcp__playwright__browser_press_key",
+      "mcp__playwright__browser_navigate_back",
+      "Bash(npx playwright *)",
+      "WebFetch(domain:testdino.com)"
+    ]
+  }
+}
