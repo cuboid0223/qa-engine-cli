@@ -1,6 +1,6 @@
 ---
 name: run
-description: Full run — Phase A + B + C in sequence. Plan, generate spec.ts, run tests, produce report.
+description: Full run — Phase A + B + C in sequence. Plan, generate spec.ts, run tests, show HTML report.
 ---
 
 # /run — Full Run: Plan + Generate + Test
@@ -21,7 +21,7 @@ docs: <url>     # optional
 
 ## Execution
 
-1. **Phase A** — Execute all steps from `/plan`. Generate `cases.md`.
+1. **Phase A** — Execute all steps from `/plan`. Generate `cases.md` and save auth state files.
 
 2. **Pause** — Show the user:
    ```
@@ -34,4 +34,4 @@ docs: <url>     # optional
 
 3. **Phase B** — Execute all steps from `/generate`. Generate `flow.spec.ts` from `cases.md`.
 
-4. **Phase C** — Execute all steps from `/test`. Run tests, write report to `reports/`.
+4. **Phase C** — Execute all steps from `/test`. Smoke check auth, run tests, show results summary.

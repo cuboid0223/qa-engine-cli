@@ -31,9 +31,9 @@ Use the following as your generation guide:
 > Imagine you are an experienced Software Engineer helping write high-quality Playwright test scripts in TypeScript based on the test cases provided. Go over the task twice to ensure accuracy and reliability. Do not hallucinate — use only what is in cases.md and the project files listed below.
 >
 > **Project context:**
-> - Auth: handled by `playwright/auth.setup.ts` (Playwright setup project) — do NOT add login steps to individual tests
+> - Auth: pre-saved state files in `playwright/.auth/` (produced by Phase A via `playwright-cli state-save`) — do NOT add login steps to individual tests
 > - Config: `playwright.config.ts`
-> - Auth state: `playwright/.auth/state.json`
+> - Auth state: `playwright/.auth/state.json` (base), `playwright/.auth/state-{role}.json` (per role)
 > - Existing sample tests: `tests/generated/` (read for patterns)
 >
 > **Selector rules (critical — follow exactly):**
@@ -59,7 +59,7 @@ Use the following as your generation guide:
 > - **Multi-role**: generate one `flow.{role}.spec.ts` per role. Each file is fully self-contained — repeat all shared steps, do NOT import from other generated files.
 > - **Single-role**: generate `flow.spec.ts` as before.
 > - **test.describe structure for multi-role**: wrap each file's tests in `test.describe('[{role}] {flow name}', () => { ... })`. The role label goes on the describe block, NOT in individual test names.
-> - Mock injection is added inline at the start of each test — see Mock Inline Injection section below.
+> - No mock injection in spec.ts — each role's state file already has the mock baked in via Phase A `playwright-cli state-save`.
 >
 > **Robustness requirements:**
 > 1. Use only the `→ locator:` values from cases.md — no fallbacks, no guessing
@@ -103,7 +103,7 @@ test.describe('<flow name>', () => {
 // Multi-role template (one file per role, e.g. flow.manager.spec.ts)
 test.describe('[manager] <flow name>', () => {
   test('TC-001: <name>', async ({ page }) => {
-    // mock injection first (see Mock Inline Injection section)
+    // storageState is pre-loaded via playwright.config.ts — no mock injection needed here
     console.log('TC-001 Step 1: navigate to target');
     await page.goto('/');
     // steps from cases.md — all steps self-contained, no shared helpers
@@ -121,76 +121,19 @@ Fix any errors before proceeding.
 
 ---
 
-## Mock Inline Injection
+## Regenerate `playwright.config.ts`
 
-After spec.ts is verified, add mock user injection and regenerate the config.
+After spec.ts is verified, regenerate the config.
 
-### Step 1 — Read `playwright/mock-users.json`
+### Step 1 — Identify roles used in this run
 
-If the file does not exist, stop and tell the user:
-```
-找不到 playwright/mock-users.json，請先執行 /plan。
-```
+Read `cases.md` and collect all unique role names from `Precondition: mocked as {role}` lines. For single-role flows with no such lines, treat as single-role.
 
-### Step 2 — Identify roles used in this run
-
-Read `cases.md` and collect all `[{role}]` tags from TC names. For single-role flows with no tags, skip Step 3 and go directly to Step 4.
-
-### Step 3 — Add inline injection to each role's tests
-
-For each test in `flow.{role}.spec.ts`, add mock user injection at the **start of the test body**, before any navigation to the test page.
-
-Choose the template based on `mechanism` in `mock-users.json` for that role:
-
-| mechanism | Behaviour |
-|---|---|
-| `urlParam` | Navigate with query param — server sets mock session cookie |
-| `localStorage` | Set item in localStorage + reload so app re-initialises |
-| `sessionStorage` | Set item in sessionStorage + reload so app re-initialises |
-| `cookie` | Add cookie directly to browser context |
-
-**urlParam:**
-```typescript
-// inject mock user: {role}
-await page.goto(`/?{param}={value}`);
-await page.waitForLoadState('networkidle');
-```
-
-**localStorage:**
-```typescript
-// inject mock user: {role}
-await page.goto('/');
-await page.waitForLoadState('networkidle');
-await page.evaluate(() => { localStorage.setItem('{key}', '{value}'); });
-await page.reload();
-await page.waitForLoadState('networkidle');
-```
-
-**sessionStorage:**
-```typescript
-// inject mock user: {role}
-await page.goto('/');
-await page.waitForLoadState('networkidle');
-await page.evaluate(() => { sessionStorage.setItem('{key}', '{value}'); });
-await page.reload();
-await page.waitForLoadState('networkidle');
-```
-
-**cookie:**
-```typescript
-// inject mock user: {role}
-await page.context().addCookies([{
-  name: '{key}',
-  value: '{value}',
-  domain: new URL(process.env.TARGET_URL || 'http://localhost:3000').hostname,
-  path: '/',
-}]);
-```
-
-### Step 4 — Regenerate `playwright.config.ts`
+### Step 2 — Regenerate `playwright.config.ts`
 
 Always regenerate `playwright.config.ts` (both single and multi-role). Import `baseConfig` from `playwright.config.base.ts`.
 
+**Single-role** (no `Precondition: mocked as` lines in cases.md):
 ```typescript
 // @ts-nocheck
 // AUTO-GENERATED by Flow-Guard /generate — do not edit by hand.
@@ -202,21 +145,42 @@ export default defineConfig({
   ...baseConfig,
   projects: [
     {
-      name: 'setup',
-      testMatch: /auth\.setup\.ts/,
-    },
-    {
       name: 'chromium',
-      testMatch: /flow.*\.spec\.ts/,
+      testMatch: /flow\.spec\.ts/,
       use: {
         ...devices['Desktop Chrome'],
         storageState: 'playwright/.auth/state.json',
       },
-      dependencies: ['setup'],
     },
   ],
 });
 ```
+
+**Multi-role** (one project per role, each pointing to its pre-saved state file):
+```typescript
+// @ts-nocheck
+// AUTO-GENERATED by Flow-Guard /generate — do not edit by hand.
+// Human settings live in playwright.config.base.ts
+import { defineConfig, devices } from '@playwright/test';
+import { baseConfig } from './playwright.config.base';
+
+export default defineConfig({
+  ...baseConfig,
+  projects: [
+    {
+      name: 'chromium-{role1}',
+      testMatch: /flow\.{role1}\.spec\.ts/,
+      use: {
+        ...devices['Desktop Chrome'],
+        storageState: 'playwright/.auth/state-{role1}.json',
+      },
+    },
+    // repeat for each role
+  ],
+});
+```
+
+No setup projects. No `dependencies`. State files are created by Phase A.
 
 ---
 
@@ -225,7 +189,8 @@ After all files are written, **stop and tell the user**:
 ```
 Phase B 完成：
 
-spec.ts:   <folder>/flow.spec.ts  (N test cases)
+spec.ts:   <folder>/flow.spec.ts  (N test cases)          ← single-role
+           <folder>/flow.{role}.spec.ts per role           ← multi-role
 config:    playwright.config.ts  (updated)
 
 請確認內容後執行：

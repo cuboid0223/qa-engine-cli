@@ -1,11 +1,11 @@
 ---
 name: test
-description: Phase C — Run spec.ts via Playwright CLI, produce markdown report.
+description: Phase C — Smoke check auth, run spec.ts via Playwright, show HTML report.
 ---
 
 # /test — Phase C: Run + Report
 
-You are executing **Phase C**. Run the generated spec.ts and produce a markdown report.
+You are executing **Phase C**. Verify auth state, run tests, and summarize results.
 
 ---
 
@@ -22,7 +22,33 @@ Extract `<ts>` from the folder name (e.g. `tests/generated/20260513-145325` → 
 
 ---
 
-## Step C1 — Run tests
+## Step C1 — Smoke check auth state
+
+Before running tests, verify the auth state is still valid.
+
+Read `<folder>/cases.md` and extract the `Target:` line to get the URL. Then:
+
+```bash
+npx playwright-cli state-load playwright/.auth/state.json
+npx playwright-cli goto <target-url-from-cases.md>
+```
+
+Read the snapshot YAML. If the URL contains `keylock`, `login`, or `sso`, the TSSO session has expired. Stop and tell the user:
+
+```
+⚠️ Auth session 已過期，請重新執行 Phase A：
+  /plan target: <target>
+```
+
+If the app loads normally, close the session and proceed:
+
+```bash
+npx playwright-cli close
+```
+
+---
+
+## Step C2 — Run tests
 
 ```bash
 npx playwright test <folder>/flow*.spec.ts
@@ -34,62 +60,28 @@ Capture stdout and stderr from the run.
 
 ---
 
-## Step C2 — Check results file
+## Step C3 — Report results
 
-Before parsing, verify `test-results/results.xml` exists.
+Parse the test counts from Playwright stdout (the summary line, e.g. `5 passed (12s)` or `3 failed, 2 passed`).
 
-If it does **not** exist, the test run failed to start. Write the report as:
+Tell the user:
 
-```markdown
-# QA Report — YYYY-MM-DD HH:MM
+```
+✅ <N> passed  ❌ <N> failed  ⚠️ <N> flaky
 
-Target: <url>
-Run: <ts>
+失敗的 TC：
+- TC-003: <name>  →  <error summary from stdout>
 
-## ❌ Run Failed — Tests Did Not Start
+完整報告（截圖 + trace）：
+  npx playwright show-report
+```
 
-<paste Playwright stdout/stderr here>
+If the run failed to start entirely (no summary line in stdout), report:
+
+```
+❌ 測試未能啟動
+
+<paste stdout/stderr>
 ```
 
 Then stop.
-
----
-
-## Step C3 — Write report
-
-Output: `reports/report-<ts>.md`
-
-`<ts>` must match the run folder name — never use the current time.
-
-```markdown
-# QA Report — YYYY-MM-DD HH:MM
-
-Target: <url>
-Run: <ts>
-
-## Summary
-
-| Total | Passed | Failed | Flaky | Duration |
-|-------|--------|--------|-------|----------|
-| N     | N      | N      | N     | Xs       |
-
-## Results
-
-### ✅ TC-001: <name>
-Duration: 1.2s
-
-### ⚠️ TC-002: <name> (flaky — passed on retry)
-Duration: 2.1s
-
-### ❌ TC-003: <name>
-**Error:** <error message>
-
-**Reproduction:**
-\`\`\`typescript
-// minimal steps to reproduce
-\`\`\`
-```
-
-Mark any TC that passed only after retry as ⚠️ (flaky).
-
-Tell the user the report path when done.

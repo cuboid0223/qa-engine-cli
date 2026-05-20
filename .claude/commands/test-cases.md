@@ -7,13 +7,31 @@ description: Generate human-readable test cases for a user flow by exploring the
 
 ## Goal
 
-Produce a `cases.md` file that:
-1. Is human-readable and editable by a QA engineer before tests run
-2. Covers the complete flow from start to expected end state
-3. Has concrete acceptance criteria (from PRD docs when provided)
-4. Includes confirmed stable Playwright locators for every interactive element
+This skill produces two things:
+
+**1. `cases.md`** — human-readable test cases:
+- Editable by a QA engineer before tests run
+- Covers the complete flow from start to expected end state
+- Has concrete acceptance criteria (from PRD docs when provided)
+- Includes confirmed stable Playwright locators for every interactive element
 
 If `output:` is provided in args, write `cases.md` to that exact path. Otherwise default to `tests/generated/cases.md`.
+
+**2. Auth state files** — browser sessions for Phase C:
+- `playwright/.auth/state.json` — base TSSO session
+- `playwright/.auth/state-{role}.json` — one per role (with mock user already injected)
+
+These state files replace `auth.setup.ts` and `mock.{role}.setup.ts`. Phase C loads them directly via `storageState` — no login or mock injection at test runtime.
+
+---
+
+## Before Exploring — Load playwright-cli skill
+
+Invoke the playwright-cli skill to load its full command reference and grant browser automation permissions:
+
+```
+Skill("playwright-cli")
+```
 
 ---
 
@@ -28,7 +46,10 @@ Before navigating any app pages, check for TSSO authentication:
      b. Run `npx playwright-cli fill <ref> "<TSSO_PASSWORD from .env>"` for the password field
      c. Run `npx playwright-cli click <submit-ref>` → read the new snapshot YAML
      d. Confirm the app is accessible (not still on login page)
-   - If already on the app: proceed directly
+     e. Run `npx playwright-cli state-save playwright/.auth/state.json` — saves TSSO auth for all subsequent test runs
+   - If already on the app:
+     a. Run `npx playwright-cli state-save playwright/.auth/state.json`
+     b. Proceed directly to exploration
 
 Run `npx playwright-cli close` when exploration is complete.
 
@@ -50,7 +71,52 @@ For each page in the flow:
 5. To interact: `npx playwright-cli click <ref>`, `npx playwright-cli fill <ref> "<text>"` — each command auto-outputs a new snapshot YAML path; read it to see the result. **The Bash stdout also contains the generated Playwright code (e.g. `await page.getByRole('button', { name: 'Submit' }).click()`). Capture this line for every action — it is the confirmed stable locator.**
 6. For elements you only observe but never click/fill (assertion targets such as result banners, role badges, error messages): run `npx playwright-cli generate-locator <ref> --raw` immediately after the snapshot, before navigating away. Record the output as the stable locator for that element.
 
-**Budget**: max 8 navigations total (including the initial auth navigation).
+**Budget**: max 8 navigations total (including the initial auth navigation). This applies to exploration only — per-role state-saves in the next section are not counted.
+
+## After Exploring — Save Per-Role Auth State
+
+After exploration is complete (and before `npx playwright-cli close`), save a state file per role so tests can load each role without repeating mock injection at runtime.
+
+Read `playwright/mock-users.json`. For each role defined there:
+
+**urlParam mechanism:**
+```bash
+npx playwright-cli state-load playwright/.auth/state.json
+npx playwright-cli goto "/?{param}={value}"
+# read snapshot YAML — confirm app loaded (not login redirect)
+npx playwright-cli state-save playwright/.auth/state-{role}.json
+```
+
+**localStorage mechanism:**
+```bash
+npx playwright-cli state-load playwright/.auth/state.json
+npx playwright-cli goto "/"
+npx playwright-cli localStorage-set {key} {value}
+npx playwright-cli goto "/"
+# read snapshot YAML — confirm app loaded
+npx playwright-cli state-save playwright/.auth/state-{role}.json
+```
+
+**sessionStorage mechanism:**
+```bash
+npx playwright-cli state-load playwright/.auth/state.json
+npx playwright-cli goto "/"
+npx playwright-cli sessionStorage-set {key} {value}
+npx playwright-cli goto "/"
+# read snapshot YAML — confirm app loaded
+npx playwright-cli state-save playwright/.auth/state-{role}.json
+```
+
+**cookie mechanism:**
+```bash
+npx playwright-cli state-load playwright/.auth/state.json
+npx playwright-cli cookie-add {key} {value}
+npx playwright-cli goto "/"
+# read snapshot YAML — confirm app loaded
+npx playwright-cli state-save playwright/.auth/state-{role}.json
+```
+
+If `mock-users.json` does not exist or has no roles, skip this section.
 
 ## Cases to always generate
 

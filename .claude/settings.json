@@ -33,18 +33,5 @@
       "mcp__playwright__browser_network_request",
       "mcp__playwright__browser_run_code_unsafe"
     ]
-  },
-  "hooks": {
-    "Stop": [
-      {
-        "matcher": "",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "powershell -ExecutionPolicy Bypass -File .claude/hooks/phase-timer.ps1"
-          }
-        ]
-      }
-    ]
   }
 }

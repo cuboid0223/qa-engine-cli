@@ -1,11 +1,11 @@
 ---
 name: plan
-description: Phase A — Explore target via npx playwright-cli (Bash/CLI only, never MCP), read source and docs, generate human-readable cases.md.
+description: Phase A — Explore target via npx playwright-cli (Bash/CLI only, never MCP), read source and docs, generate cases.md and save auth state files.
 ---
 
 # /plan — Phase A: Generate cases.md
 
-You are executing **Phase A**. Your job: understand the flow, discover selectors via MCP snapshots, and produce a human-readable `cases.md` that a QA engineer can review and edit before tests run.
+You are executing **Phase A**. Your job: understand the flow, discover selectors via playwright-cli snapshots, and produce a human-readable `cases.md` that a QA engineer can review and edit before tests run.
 
 You do NOT generate spec.ts here. You do NOT run tests.
 
@@ -22,6 +22,14 @@ docs: <url>            # optional — PRD/spec URL for acceptance criteria
 ---
 
 ## Steps
+
+### Step 0 — Load playwright-cli skill
+
+Invoke the playwright-cli skill to load its full command reference and grant browser automation permissions:
+
+```
+Skill("playwright-cli")
+```
 
 ### Step 1 — Set timestamp
 
@@ -67,7 +75,7 @@ Also look for:
 
 ### Step 3.5 — Mock user resolution
 
-> **CRITICAL**: NEVER use TSSO credentials (`TSSO_USERNAME` / `TSSO_PASSWORD`) for mock user fields. TSSO is handled by `auth.setup.ts` only. Mock user IDs are separate values.
+> **CRITICAL**: NEVER use TSSO credentials (`TSSO_USERNAME` / `TSSO_PASSWORD`) for mock user fields. TSSO credentials are for Phase A browser login only. Mock user IDs are separate values.
 
 1. **Check cache**: if `playwright/mock-users.json` exists, read it.
    - Compare `baseURL` in the file with the current `target`.
@@ -108,10 +116,10 @@ Also look for:
 ```
 
    Supported `mechanism` values:
-   - `"urlParam"` — navigate to `/?{param}={value}`, server sets cookie
-   - `"localStorage"` — inject via `page.evaluate` + `localStorage.setItem`
-   - `"sessionStorage"` — inject via `page.evaluate` + `sessionStorage.setItem`
-   - `"cookie"` — inject via `page.context().addCookies(...)`
+   - `"urlParam"` — `playwright-cli goto /?{param}={value}`, server sets cookie
+   - `"localStorage"` — `playwright-cli localStorage-set {key} {value}`
+   - `"sessionStorage"` — `playwright-cli sessionStorage-set {key} {value}`
+   - `"cookie"` — `playwright-cli cookie-add {key} {value}`
 
 ### Step 4 — Write cases.md
 
@@ -121,7 +129,7 @@ Also look for:
 Skill("test-cases", args: "target: <target> source: <source> docs: <docs> output: tests/generated/<ts>/cases.md")
 ```
 
-Pass the same `target`, `source`, `docs`, and the resolved `output` path. The skill handles all MCP exploration and returns `cases.md` content written to the output path.
+Pass the same `target`, `source`, `docs`, and the resolved `output` path. The skill handles all playwright-cli exploration, saves auth state files to `playwright/.auth/`, and writes `cases.md` to the output path.
 
 **After the skill completes**, read `tests/generated/<ts>/cases.md` and apply the following additional rules if the flow has role-based branching. Rewrite the file with these additions:
 
@@ -131,7 +139,7 @@ Pass the same `target`, `source`, `docs`, and the resolved `output` path. The sk
 - Name each TC with the role in the description: `TC-002: Editor 申請假單`.
 - Do not add branch metadata (e.g. `Branch-of:`) — clear naming is sufficient.
 
-> **Do NOT record the mock-user injection as a TC step.** Mock setup is handled inline in spec.ts before each test. In each TC, write `**Precondition:** mocked as {role}` in the header instead.
+> **Do NOT record the mock-user injection as a TC step.** Mock setup is pre-baked into `playwright/.auth/state-{role}.json` by Phase A. In each TC, write `**Precondition:** mocked as {role}` in the header instead.
 
 ### Step 5 — Summary
 

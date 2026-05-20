@@ -2,13 +2,15 @@
 .env
 .env.staging
 .env.prod
-.mcp.json
+
 
 # generated artifacts
+playwright/
 reports/
 tests/generated/
 test-results/
 playwright-report/
+.playwright-cli/
 context-cache/*.md
 
 # node
