@@ -41,6 +41,45 @@ Acknowledge with one line: `target: ... | source: ... | docs: ...`, then begin i
 
 ---
 
+## Clarification Protocol
+
+**When in doubt, stop and ask. Never guess. Never proceed with assumptions.**
+
+Any time a pre-condition is missing, a parameter is ambiguous, or the correct behavior is unclear, stop immediately and ask using this template — one question at a time, walking down each branch of the decision tree and resolving dependencies before moving to the next question:
+
+```
+**[Topic]**
+[One sentence explaining why you stopped.]
+- **A.** [Option]
+- **B.** [Option]
+- **C.** [Option]
+
+> **My recommended answer:** [A/B/C] — [one-sentence reason]
+```
+
+Wait for the user's answer before continuing. The next question may depend on the answer to this one.
+
+---
+
+## Phase Pre-flight Checks
+
+Before each phase begins, verify all pre-conditions. If any check fails, stop and use the Clarification Protocol above — do not proceed.
+
+**Phase A (`/plan`)**
+- `target:` URL must be reachable — verify with a connection check before opening playwright-cli
+- `.env` must exist and contain `TSSO_USERNAME` + `TSSO_PASSWORD`
+
+**Phase B (`/generate`)**
+- `cases.md` must exist in the expected timestamped folder
+- `playwright/.auth/state-{role}.json` must exist for **every role** referenced in `cases.md` — missing auth state means Phase A was incomplete; stop and require `/plan` first
+- All roles must be explicitly listed — if the role list is ambiguous, stop and ask
+
+**Phase C (`/test`)**
+- `flow.spec.ts` must exist in the expected timestamped folder
+- `playwright.config.ts` must exist and reference valid `storageState` paths
+
+---
+
 ## Core Rules
 
 1. **Phase A uses `npx playwright-cli` (via Bash) for exploration.** Start with `npx playwright-cli open <url>`. After each command, playwright-cli auto-outputs a snapshot YAML file path — use the `Read` tool to read that file to inspect the current state. End with `npx playwright-cli close`.
@@ -51,6 +90,8 @@ Acknowledge with one line: `target: ... | source: ... | docs: ...`, then begin i
 6. **Credentials come from `.env` only.** Required keys: `TSSO_USERNAME`, `TSSO_PASSWORD`. If missing, stop and tell the user.
 7. **TSSO credentials are not mock user IDs.** `TSSO_USERNAME`/`TSSO_PASSWORD` are for TSSO login during Phase A exploration only. Mock user identifiers (e.g. `mockId`) are separate values provided explicitly in the prompt or read from `playwright/mock-users.json`.
 8. **Mock user mechanism is discovered from source code, not browser automation.** Never use playwright-cli to click through role switchers or mock user UI. If `source:` is not provided and `mock-users.json` does not exist, ask the user for the mechanism.
+9. **`spec.ts` must contain zero auth logic.** Login, TSSO flow, and mock user switching belong exclusively in `playwright.config.ts` via `storageState`. If a test case appears to require inline login, stop and ask — never write login steps into spec.ts.
+10. **`playwright.config.ts` must use `projects` for multi-role auth.** Each role gets its own project entry pointing to `playwright/.auth/state-{role}.json`. Never use a single global `storageState` when multiple roles exist.
 
 ---
 
@@ -67,6 +108,35 @@ Acknowledge with one line: `target: ... | source: ... | docs: ...`, then begin i
 | Config base | `playwright.config.base.ts` | Human-maintained |
 
 The timestamp is set once at Phase A start and reused across all phases of a run.
+
+---
+
+## Dynamic Element Waits
+
+Some UI elements take time to appear due to debounce, animation, or async loading. The global `expect.timeout` in `playwright.config.base.ts` is set to **10 seconds** as a baseline. For elements known to be slower, Phase A and Phase B share structured wait metadata via `cases.md`.
+
+**Phase A — annotation rule:**
+When exploring and a step involves an element that appears after a delay (debounce, transition, async fetch), add a `wait:` field to that step in `cases.md`:
+
+```yaml
+- step: "search for user in Dev Tools modal"
+  action: fill user-search-input with "editor"
+  wait:
+    element: user-result-editor
+    reason: 1000ms debounce on search input
+    timeout: 5000
+```
+
+**Phase B — consumption rule:**
+For every step in `cases.md` that has a `wait:` field, emit the `{ timeout }` option on the corresponding `expect()` call:
+
+```ts
+await page.getByTestId('user-search-input').fill('editor');
+await expect(page.getByTestId('user-result-editor'))
+  .toBeVisible({ timeout: 5000 }); // 1000ms debounce on search input
+```
+
+Never use `page.waitForTimeout()` — always use `expect(..., { timeout })` or Playwright's built-in auto-waiting.
 
 ---
 

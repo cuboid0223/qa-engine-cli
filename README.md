@@ -1,6 +1,6 @@
 # QA Engine
 
-AI 驅動的 QA 測試系統，透過 Claude Code 與 `npx playwright-cli`，對 web 應用執行系統性流程驗證。
+AI 驅動的 QA 測試系統，透過 **Claude** Code 與 `npx playwright-cli`，對 web 應用執行系統性流程驗證。
 
 **核心設計**：三階段 workflow（Plan → Generate → Test），每階段產出獨立可稽核的檔案，中間可人工介入審查。
 
@@ -33,7 +33,7 @@ reports/
     traces/<timestamp>/       ← Phase C：Playwright trace（自動收集）
 
 playwright/.auth/
-    state.json        ← 登入狀態（gitignored）
+    state-{role}.json ← 各角色登入狀態（gitignored）
 ```
 
 ---
@@ -161,7 +161,7 @@ docs: ./prd.md
 ### 1. 安裝依賴
 
 ```bash
-npm install
+npm install                        # 含 @playwright/cli（playwright-cli 指令）
 npx playwright install chromium
 ```
 
@@ -171,14 +171,15 @@ npx playwright install chromium
 cp .env.example .env
 ```
 
-必填：
+填入：
 
 ```
+TARGET_URL=http://localhost:3000   # 測試目標（覆蓋 playwright.config.ts 預設值）
 TSSO_USERNAME=...
 TSSO_PASSWORD=...
 ```
 
-`.env` 已被 `.gitignore`，不會進版控。
+
 
 ---
 
@@ -202,9 +203,8 @@ qa-engine/
 │       └── test-cases.md         ← Phase A 探索邏輯
 │
 ├── playwright/
-│   ├── auth.setup.ts             ← TSSO 登入流程
 │   └── .auth/
-│       └── state.json            ← 登入狀態（gitignored）
+│       └── state-{role}.json     ← 各角色登入狀態（gitignored，Phase A 產生）
 │
 ├── tests/
 │   └── generated/                ← 每次 /run 自動產生（gitignored）

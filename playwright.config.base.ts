@@ -14,6 +14,10 @@ export const baseConfig = {
     ['list'],
   ],
 
+  expect: {
+    timeout: 10_000,
+  },
+
   use: {
     baseURL: process.env.TARGET_URL || 'http://localhost:3000',
     trace: 'on-first-retry',
