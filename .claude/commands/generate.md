@@ -20,6 +20,17 @@ Or runs without argument — use the most recently modified folder under `tests/
 
 ---
 
+## Step 0 — Read reference files
+
+Before writing any code, read these files in order to internalize assertion patterns, waiting strategy, and test structure requirements:
+
+1. `.claude/skills/playwright-skill/core/assertions-and-waiting.md`
+2. `.claude/skills/playwright-skill/core/forms-and-validation.md`
+3. `.claude/skills/playwright-skill/core/flaky-tests.md`
+4. `.claude/skills/playwright-skill/core/test-data-management.md`
+
+---
+
 ## Phase B: Generate spec.ts
 
 Read `<folder>/cases.md` and generate `<folder>/flow.spec.ts`.
@@ -133,6 +144,8 @@ Read `cases.md` and collect all unique role names from `Precondition: mocked as 
 
 Always regenerate `playwright.config.ts` (both single and multi-role). Import `baseConfig` from `playwright.config.base.ts`.
 
+**Extract `testDir` from the session folder path:** The `<folder>` argument (e.g. `tests/generated/20260520-135959`) contains the timestamp. Set `testDir` to `./<folder>` in the generated config. This scopes Phase C to only this session's spec files. Never omit `testDir` or point it at the parent `./tests/generated`.
+
 **Single-role** (no `Precondition: mocked as` lines in cases.md):
 ```typescript
 // @ts-nocheck
@@ -143,6 +156,7 @@ import { baseConfig } from './playwright.config.base';
 
 export default defineConfig({
   ...baseConfig,
+  testDir: './tests/generated/<ts>',  // replace <ts> with actual timestamp
   projects: [
     {
       name: 'chromium',
@@ -166,6 +180,7 @@ import { baseConfig } from './playwright.config.base';
 
 export default defineConfig({
   ...baseConfig,
+  testDir: './tests/generated/<ts>',  // replace <ts> with actual timestamp
   projects: [
     {
       name: 'chromium-{role1}',

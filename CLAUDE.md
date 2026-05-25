@@ -26,6 +26,7 @@ PHASE C (Run)     → smoke check → npx playwright test → HTML report
 - `/generate` — Phase B only. Generate `spec.ts` from `cases.md`. Stop and wait for user review.
 - `/test` — Phase C only. Run `spec.ts` via Playwright CLI, produce HTML report.
 - `/run` — All three phases in sequence.
+- `/reauth` — Refresh expired TSSO auth state only. Rewrites `playwright/.auth/state*.json` without touching `cases.md`, `spec.ts`, or the session folder. Use when Phase C reports auth expired.
 
 ---
 
@@ -75,8 +76,14 @@ Before each phase begins, verify all pre-conditions. If any check fails, stop an
 - All roles must be explicitly listed — if the role list is ambiguous, stop and ask
 
 **Phase C (`/test`)**
-- `flow.spec.ts` must exist in the expected timestamped folder
+- At least one `flow*.spec.ts` must exist in the expected timestamped folder
 - `playwright.config.ts` must exist and reference valid `storageState` paths
+- Print the `testDir` value from `playwright.config.ts` before running — e.g. `▶ Running session: tests/generated/20260520-135959` — so the user can confirm the correct session is targeted. Do not block on this; proceed unless the user intervenes.
+
+**`/reauth`**
+- `.env` must exist and contain `TSSO_USERNAME` + `TSSO_PASSWORD`
+- `playwright/mock-users.json` must exist — if missing, run `/plan` first
+- `baseURL` in `mock-users.json` must be reachable
 
 ---
 
@@ -100,7 +107,8 @@ Before each phase begins, verify all pre-conditions. If any check fails, stop an
 | Artifact | Path | Owner |
 |---|---|---|
 | cases.md | `tests/generated/YYYYMMDD-HHMMSS/cases.md` | Phase A |
-| spec.ts | `tests/generated/YYYYMMDD-HHMMSS/flow.spec.ts` | Phase B |
+| spec.ts (single-role) | `tests/generated/YYYYMMDD-HHMMSS/flow.spec.ts` | Phase B |
+| spec.ts (multi-role) | `tests/generated/YYYYMMDD-HHMMSS/flow.{role}.spec.ts` | Phase B |
 | Auth state | `playwright/.auth/state.json` | Phase A (`playwright-cli state-save`) |
 | Role auth state | `playwright/.auth/state-{role}.json` | Phase A (`playwright-cli state-save` per role) |
 | Mock user cache | `playwright/mock-users.json` | Phase A (write once, reuse) |
@@ -108,6 +116,91 @@ Before each phase begins, verify all pre-conditions. If any check fails, stop an
 | Config base | `playwright.config.base.ts` | Human-maintained |
 
 The timestamp is set once at Phase A start and reused across all phases of a run.
+
+---
+
+## Generate Stage (Phase B)
+
+Before generating `spec.ts`, read these reference files in order:
+1. `.claude/skills/playwright-skill/core/assertions-and-waiting.md`
+2. `.claude/skills/playwright-skill/core/forms-and-validation.md`
+3. `.claude/skills/playwright-skill/core/flaky-tests.md`
+4. `.claude/skills/playwright-skill/core/test-data-management.md`
+5. `.claude/skills/playwright-skill/core/locator-strategy.md`
+6. `.claude/skills/playwright-skill/core/fixtures-and-hooks.md`
+
+Apply the waiting strategy and assertion patterns defined in those files when writing test structure.
+
+**Pattern-based guide loading:**
+
+After reading the static guides above, read `cases.md` and check the top-level `patterns:` field. For each pattern listed, read the corresponding guide(s) before generating:
+
+| Pattern | Guide(s) to read |
+|---|---|
+| `crud` | `crud-testing.md` |
+| `search-filter` | `search-and-filter.md` |
+| `file-upload` | `file-upload-download.md`, `file-operations.md` |
+| `multi-tab` | `multi-context-and-popups.md` |
+| `multi-user` | `multi-user-and-collaboration.md` |
+| `drag-drop` | `drag-and-drop.md` |
+| `websocket` | `websockets-and-realtime.md` |
+| `iframe` | `iframes-and-shadow-dom.md` |
+| `network-mock` | `network-mocking.md`, `when-to-mock.md` |
+| `browser-api` | `browser-apis.md` |
+| `clock-mock` | `clock-and-time-mocking.md` |
+
+If `patterns:` is absent or empty, skip this step and proceed with the 6 static guides only.
+
+**Locator quality standard — enforced by Phase A, verified by Phase B:**
+
+`cases.md` `→ locator:` values must conform to this priority order. Phase B copies them verbatim from `cases.md`. If Phase B encounters a `→ locator:` value that violates the prohibition list below, stop and tell the user which line in `cases.md` to fix — do not silently rewrite it.
+
+**Locator priority (strict — use first that applies):**
+1. `getByRole()` — default for interactive elements
+2. `getByLabel()` — form inputs
+3. `getByText()` — non-interactive content
+4. `getByPlaceholder()` — inputs without label
+5. `getByAltText()` — images
+6. `getByTitle()` — title attribute
+7. `getByTestId()` — only when `data-testid` is confirmed present in the source
+8. `locator('[attr="value"]')` — stable attribute selectors only (last resort)
+
+**Prohibition list — these patterns must not appear in `spec.ts`:**
+
+| ❌ Forbidden | ✅ Replace with |
+|---|---|
+| `page.waitForTimeout(n)` | `expect(locator).toBeVisible({ timeout: n })` |
+| `locator('.class-name')` | `getByRole()` or `getByLabel()` |
+| `locator('div > span:nth-child(2)')` | filter by text or role |
+| `locator('//xpath/position[1]')` | semantic locator |
+| `(await locator.textContent()).toBe(...)` | `expect(locator).toHaveText(...)` |
+| Hardcoded unique strings (e.g. `'Flow Guard Test Task'`) | Use timestamp suffix: `` `Task ${Date.now()}` `` |
+
+**`playwright.config.ts` — `testDir` rule:** The generated config must set `testDir` to the session-specific folder (e.g. `./tests/generated/20260520-135959`), not the parent `./tests/generated`. This is the only mechanism that scopes Phase C to the current session. Never omit this field or point it at the parent directory.
+
+**Self-review pass:** After generating `spec.ts`, scan every line for non-locator violations (e.g. `page.waitForTimeout`, `(await locator.textContent()).toBe`, hardcoded unique strings). Fix these — they are Phase B's own code structure. If a `→ locator:` value copied from `cases.md` violates the prohibition list (e.g. `.class-name`, xpath), stop and tell the user which line in `cases.md` to fix — do not silently rewrite it.
+
+---
+
+## Pattern Annotation
+
+Some flows use UI patterns that require specialized Playwright guidance. Phase A detects these patterns during exploration and annotates `cases.md` so Phase B knows which extra guides to load.
+
+**Phase A — annotation rule:**
+At the top of `cases.md`, add a `patterns:` field listing all patterns present in this flow. Use only values from the enum below — no freeform values.
+
+```yaml
+patterns:
+  - crud
+  - search-filter
+```
+
+Valid values: `crud`, `search-filter`, `file-upload`, `multi-tab`, `multi-user`, `drag-drop`, `websocket`, `iframe`, `network-mock`, `browser-api`, `clock-mock`
+
+If none apply, omit the field entirely — do not write `patterns: []`.
+
+**Phase B — consumption rule:**
+Covered in the Generate Stage section above.
 
 ---
 
@@ -137,6 +230,50 @@ await expect(page.getByTestId('user-result-editor'))
 ```
 
 Never use `page.waitForTimeout()` — always use `expect(..., { timeout })` or Playwright's built-in auto-waiting.
+
+---
+
+## Test Data Cleanup
+
+Some test cases create persistent data (tasks, records, entries) as part of the flow being validated. When they do, Phase A annotates the case in `cases.md` and Phase B generates a `test.afterEach` block to clean up — keeping the environment stable across runs.
+
+**Phase A — annotation rule:**
+When a step creates a resource that survives the session and could affect future runs, add a `cleanup:` field to that **case** in `cases.md`:
+
+```yaml
+- case: "建立 Task 並確認出現在列表"
+  cleanup:
+    resource: task
+    id_from: createdTaskId
+    endpoint: /api/tasks/{id}
+    method: DELETE
+```
+
+**Phase B — consumption rule:**
+For every case in `cases.md` that has a `cleanup:` field, emit a `let` variable to capture the created resource's ID, and a `test.afterEach` block that calls the DELETE endpoint via Playwright's built-in `request` fixture. The `request` fixture inherits `storageState` from `playwright.config.ts` — no additional auth logic is needed in the spec.
+
+```ts
+test.describe('建立 Task 並確認出現在列表', () => {
+  let createdTaskId: string | undefined;
+
+  test.afterEach(async ({ request }) => {
+    if (createdTaskId) {
+      await request.delete(`/api/tasks/${createdTaskId}`).catch(() => {});
+      createdTaskId = undefined;
+    }
+  });
+
+  test('建立 Task 後應出現在列表中', async ({ page }) => {
+    const taskName = `Task ${Date.now()}`;
+    // ... steps that create the task
+    // capture the ID from URL, response body, or page attribute
+    createdTaskId = /* extracted ID */;
+    await expect(page.getByRole('listitem').filter({ hasText: taskName })).toBeVisible();
+  });
+});
+```
+
+Never omit cleanup for cases annotated with `cleanup:`. Leaked test data causes cascading failures in subsequent runs.
 
 ---
 

@@ -36,8 +36,10 @@ npx playwright-cli goto <target-url-from-cases.md>
 Read the snapshot YAML. If the URL contains `keylock`, `login`, or `sso`, the TSSO session has expired. Stop and tell the user:
 
 ```
-⚠️ Auth session 已過期，請重新執行 Phase A：
-  /plan target: <target>
+⚠️ Auth session 已過期，請執行：
+  /reauth
+
+完成後再執行 /test 繼續。cases.md 和 spec.ts 不受影響。
 ```
 
 If the app loads normally, close the session and proceed:
