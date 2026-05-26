@@ -33,7 +33,7 @@ Skill("playwright-cli")
 
 ### Step 1 — Set timestamp
 
-Set `<ts>` = current time in `YYYYMMDD-HHMMSS` format. All output goes to `tests/generated/<ts>/`.
+Set `<ts>` = current time in `YYYYMMDD-HHMMSS` format, using Asia/Taipei (UTC+8). All output goes to `tests/generated/<ts>/`.
 
 ### Step 2 — Read docs (if provided)
 
