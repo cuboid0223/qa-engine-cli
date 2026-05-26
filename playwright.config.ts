@@ -6,23 +6,15 @@ import { baseConfig } from './playwright.config.base';
 
 export default defineConfig({
   ...baseConfig,
+  testDir: './tests/generated/20260527-005133',
   projects: [
     {
-      name: 'chromium-editor',
-      testMatch: /flow\.editor\.spec\.ts/,
+      name: 'chromium',
+      testMatch: /flow\.spec\.ts/,
       use: {
         ...devices['Desktop Chrome'],
-        baseURL: 'http://localhost:3000',
-        storageState: 'playwright/.auth/state-editor.json',
-      },
-    },
-    {
-      name: 'chromium-admin',
-      testMatch: /flow\.admin\.spec\.ts/,
-      use: {
-        ...devices['Desktop Chrome'],
-        baseURL: 'http://localhost:3000',
-        storageState: 'playwright/.auth/state-admin.json',
+        baseURL: 'https://www.saucedemo.com',
+        storageState: 'playwright/.auth/state-standard.json',
       },
     },
   ],

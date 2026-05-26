@@ -36,9 +36,10 @@ PHASE C (Run)     → smoke check → npx playwright test → HTML report
 target: http://localhost:3000     # required — base URL
 source: ../my-app/src             # optional — source code for white-box analysis
 docs: https://notion.so/my-prd    # optional — PRD/spec URL for acceptance criteria
+locale: zh-TW                     # optional — browser locale for Phase A exploration and Phase C runs (default: zh-TW)
 ```
 
-Acknowledge with one line: `target: ... | source: ... | docs: ...`, then begin immediately.
+Acknowledge with one line: `target: ... | source: ... | docs: ... | locale: ...`, then begin immediately.
 
 ---
 
@@ -84,6 +85,7 @@ Before each phase begins, verify all pre-conditions. If any check fails, stop an
 - `.env` must exist and contain `TSSO_USERNAME` + `TSSO_PASSWORD`
 - `playwright/mock-users.json` must exist — if missing, run `/plan` first
 - `baseURL` in `mock-users.json` must be reachable
+- After each role login, repeat the language switch step (same logic as Phase A rule 11) before `state-save` — the `locale:` value is read from `cases.md` in the current session folder
 
 ---
 
@@ -99,6 +101,7 @@ Before each phase begins, verify all pre-conditions. If any check fails, stop an
 8. **Mock user mechanism is discovered from source code, not browser automation.** Never use playwright-cli to click through role switchers or mock user UI. If `source:` is not provided and `mock-users.json` does not exist, ask the user for the mechanism.
 9. **`spec.ts` must contain zero auth logic.** Login, TSSO flow, and mock user switching belong exclusively in `playwright.config.ts` via `storageState`. If a test case appears to require inline login, stop and ask — never write login steps into spec.ts.
 10. **`playwright.config.ts` must use `projects` for multi-role auth.** Each role gets its own project entry pointing to `playwright/.auth/state-{role}.json`. Never use a single global `storageState` when multiple roles exist.
+11. **Phase A must switch the app language immediately after each role login, before exploration or `state-save` for that role.** After each login succeeds, look for an i18n / language switcher element in the snapshot YAML and click to select the `locale:` value (default `zh-TW`). Repeat this for every role — each `state-save` must capture the language preference. If no switcher is found, print `⚠ 找不到語言切換器，將僅依賴 use.locale: {locale}` (substituting the actual locale value) and continue — Phase B's `use.locale` fallback will handle it. This ensures snapshot text and `cases.md` locator descriptions match the language used during Phase C test runs. Phase A must also write the resolved `locale:` value as a top-level field in `cases.md` so Phase B can read it without requiring the user to re-specify it.
 
 ---
 
@@ -177,6 +180,20 @@ If `patterns:` is absent or empty, skip this step and proceed with the 6 static 
 | Hardcoded unique strings (e.g. `'Flow Guard Test Task'`) | Use timestamp suffix: `` `Task ${Date.now()}` `` |
 
 **`playwright.config.ts` — `testDir` rule:** The generated config must set `testDir` to the session-specific folder (e.g. `./tests/generated/20260520-135959`), not the parent `./tests/generated`. This is the only mechanism that scopes Phase C to the current session. Never omit this field or point it at the parent directory.
+
+**`playwright.config.ts` — `locale` rule:** The generated config must include `locale` in the top-level `use:` block. Read the value from the `locale:` field at the top of `cases.md` (written by Phase A). This acts as a fallback for apps that detect language from the `Accept-Language` header rather than a persistent cookie or profile setting. Write it directly in a `use:` override — do not modify `playwright.config.base.ts`.
+
+```ts
+export default defineConfig({
+  ...baseConfig,
+  testDir: './tests/generated/20260520-135959',
+  use: {
+    ...baseConfig.use,
+    locale: 'zh-TW',   // read from cases.md locale: field
+  },
+  projects: [ ... ],
+});
+```
 
 **Self-review pass:** After generating `spec.ts`, scan every line for non-locator violations (e.g. `page.waitForTimeout`, `(await locator.textContent()).toBe`, hardcoded unique strings). Fix these — they are Phase B's own code structure. If a `→ locator:` value copied from `cases.md` violates the prohibition list (e.g. `.class-name`, xpath), stop and tell the user which line in `cases.md` to fix — do not silently rewrite it.
 
