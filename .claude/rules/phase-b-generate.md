@@ -57,17 +57,61 @@ If `patterns:` is absent or empty, skip this step and proceed with the 6 static 
 
 **`playwright.config.ts` — `testDir` rule:** The generated config must set `testDir` to the session-specific folder (e.g. `./tests/generated/20260520-135959`), not the parent `./tests/generated`. This is the only mechanism that scopes Phase C to the current session. Never omit this field or point it at the parent directory.
 
-**`playwright.config.ts` — `locale` rule:** The generated config must include `locale` in the top-level `use:` block. Read the value from the `locale:` field at the top of `cases.md` (written by Phase A). This acts as a fallback for apps that detect language from the `Accept-Language` header rather than a persistent cookie or profile setting. Write it directly in a `use:` override — do not modify `playwright.config.base.ts`.
+**`playwright.config.ts` — `locale` rule:** The generated config must include `locale` in the top-level `use:` block. Read the value from the `locale:` field at the top of `cases.md` (written by Phase A). **If `locale:` is absent from `cases.md` frontmatter, stop immediately** — do not default or guess — and tell the user: `cases.md 缺少 locale: 欄位，Phase A 未完整執行，請重新執行 /plan。` This acts as a fallback for apps that detect language from the `Accept-Language` header rather than a persistent cookie or profile setting. Write it directly in a `use:` override — do not modify `playwright.config.base.ts`.
 
+**`playwright.config.ts` — `projects` chain rule:** Every generated config — single-role or multi-role — must use a 3-project chain. Never generate a flat single-project config.
+
+**Single-role** (no `Precondition: mocked as` in cases.md):
 ```ts
 export default defineConfig({
   ...baseConfig,
   testDir: './tests/generated/20260520-135959',
-  use: {
-    ...baseConfig.use,
-    locale: 'zh-TW',   // read from cases.md locale: field
-  },
-  projects: [ ... ],
+  use: { ...baseConfig.use, locale: 'zh-TW', baseURL: '<target>' },
+  projects: [
+    { name: 'tsso-setup', testMatch: /playwright[\/\\]setup[\/\\]tsso\.setup\.ts/ },
+    {
+      name: 'mock-user-setup',
+      testMatch: /playwright[\/\\]setup[\/\\]mock-user\.setup\.ts/,
+      dependencies: ['tsso-setup'],
+      use: { storageState: 'playwright/.auth/tsso-base.json' },
+    },
+    {
+      name: 'chrome',
+      testMatch: /flow\.spec\.ts/,
+      dependencies: ['mock-user-setup'],
+      use: { channel: 'chrome', storageState: 'playwright/.auth/state.json' },
+    },
+  ],
+});
+```
+
+**Multi-role** (Phase B emits one `chrome-{role}` project per role — replace the example names with actual role names):
+```ts
+export default defineConfig({
+  ...baseConfig,
+  testDir: './tests/generated/20260520-135959',
+  use: { ...baseConfig.use, locale: 'zh-TW', baseURL: '<target>' },
+  projects: [
+    { name: 'tsso-setup', testMatch: /playwright[\/\\]setup[\/\\]tsso\.setup\.ts/ },
+    {
+      name: 'mock-user-setup',
+      testMatch: /playwright[\/\\]setup[\/\\]mock-user\.setup\.ts/,
+      dependencies: ['tsso-setup'],
+      use: { storageState: 'playwright/.auth/tsso-base.json' },
+    },
+    {
+      name: 'chrome-admin',                       // ← actual role name
+      testMatch: /flow\.admin\.spec\.ts/,         // ← actual role name
+      dependencies: ['mock-user-setup'],
+      use: { channel: 'chrome', storageState: 'playwright/.auth/state-admin.json' },
+    },
+    {
+      name: 'chrome-viewer',                      // ← repeat for each additional role
+      testMatch: /flow\.viewer\.spec\.ts/,
+      dependencies: ['mock-user-setup'],
+      use: { channel: 'chrome', storageState: 'playwright/.auth/state-viewer.json' },
+    },
+  ],
 });
 ```
 

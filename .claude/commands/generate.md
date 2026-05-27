@@ -49,12 +49,12 @@ Use the following as your generation guide:
 >
 > **Selector rules (critical — follow exactly):**
 >
-> cases.md records a `→ locator:` line for every interactive element and every assertion target. These locators were confirmed during Phase A from playwright-cli stdout or `generate-locator --raw` — they are the ground truth.
+> cases.md records a `locator:` line (3-space indent under each step or assertion) for every interactive element and every assertion target. These locators were confirmed during Phase A from playwright-cli stdout or `generate-locator --raw` — they are the ground truth.
 >
-> **Copy the `→ locator:` value verbatim. Never derive or guess a selector yourself.**
+> **Copy the `locator:` value verbatim. Never derive or guess a selector yourself.**
 >
 > - Refs like `e15` in cases.md are playwright-cli session-scoped identifiers. They are invalid in Playwright test runs. Never use refs as selectors.
-> - If a step or assertion is missing a `→ locator:` line, stop and tell the user: `cases.md missing locator for step N — re-run /plan to fix.`
+> - If a step or assertion is missing a `locator:` line, stop and tell the user: `cases.md missing locator for step N — re-run /plan to fix.`
 > - Do not fall back to CSS classes, XPath, or any selector not present in cases.md.
 >
 > **Test structure requirements:**
@@ -63,7 +63,7 @@ Use the following as your generation guide:
 > 3. All selectors must be stable (see selector rules above)
 > 4. Log each step: `console.log('TC-NNN Step N: <description>')`
 > 5. Explicit waits: `waitForLoadState('networkidle')` or locator-based — never `waitForTimeout`
-> 6. Assertions that directly match Acceptance Criteria in cases.md
+> 6. Assertions that directly match Assertions section in cases.md
 >
 > **Role-branching rules:**
 > - **Detect by Precondition**: if any TC in cases.md has `Precondition: mocked as {role}`, the flow is multi-role → split files. If no Precondition exists, the flow is single-role → one file.
@@ -73,7 +73,7 @@ Use the following as your generation guide:
 > - No mock injection in spec.ts — each role's state file already has the mock baked in via Phase A `playwright-cli state-save`.
 >
 > **Robustness requirements:**
-> 1. Use only the `→ locator:` values from cases.md — no fallbacks, no guessing
+> 1. Use only the `locator:` values from cases.md — no fallbacks, no guessing
 > 2. Handle unexpected dialogs by dismissing them
 > 3. Timeout handling with clear error messages
 >
@@ -140,11 +140,15 @@ After spec.ts is verified, regenerate the config.
 
 Read `cases.md` and collect all unique role names from `Precondition: mocked as {role}` lines. For single-role flows with no such lines, treat as single-role.
 
-### Step 2 — Regenerate `playwright.config.ts`
+### Step 2 — Regenerate `playwright.config.ts` and `playwright.config.session.ts`
 
-Always regenerate `playwright.config.ts` (both single and multi-role). Import `baseConfig` from `playwright.config.base.ts`.
+Always regenerate both config files (both single and multi-role). Import `baseConfig` from `playwright.config.base.ts`.
 
 **Extract `testDir` from the session folder path:** The `<folder>` argument (e.g. `tests/generated/20260520-135959`) contains the timestamp. Set `testDir` to `./<folder>` in the generated config. This scopes Phase C to only this session's spec files. Never omit `testDir` or point it at the parent `./tests/generated`.
+
+**Read `locale:` from `cases.md` frontmatter before generating config.** If `locale:` is absent, stop immediately: `cases.md 缺少 locale: 欄位，Phase A 未完整執行，請重新執行 /plan。`
+
+Every config — single-role or multi-role — uses a **3-project chain**: `tsso-setup → mock-user-setup → chromium-{role}`.
 
 **Single-role** (no `Precondition: mocked as` lines in cases.md):
 ```typescript
@@ -157,12 +161,30 @@ import { baseConfig } from './playwright.config.base';
 export default defineConfig({
   ...baseConfig,
   testDir: './tests/generated/<ts>',  // replace <ts> with actual timestamp
+  use: {
+    ...baseConfig.use,
+    locale: 'zh-TW',  // read from cases.md locale: field
+    baseURL: '<target>',
+  },
   projects: [
     {
-      name: 'chromium',
-      testMatch: /flow\.spec\.ts/,
+      name: 'tsso-setup',
+      testMatch: /playwright[\/\\]setup[\/\\]tsso\.setup\.ts/,
+    },
+    {
+      name: 'mock-user-setup',
+      testMatch: /playwright[\/\\]setup[\/\\]mock-user\.setup\.ts/,
+      dependencies: ['tsso-setup'],
       use: {
-        ...devices['Desktop Chrome'],
+        storageState: 'playwright/.auth/tsso-base.json',
+      },
+    },
+    {
+      name: 'chrome',
+      testMatch: /flow\.spec\.ts/,
+      dependencies: ['mock-user-setup'],
+      use: {
+        channel: 'chrome',
         storageState: 'playwright/.auth/state.json',
       },
     },
@@ -170,7 +192,7 @@ export default defineConfig({
 });
 ```
 
-**Multi-role** (one project per role, each pointing to its pre-saved state file):
+**Multi-role** (one test project per role, all depending on shared `mock-user-setup`):
 ```typescript
 // @ts-nocheck
 // AUTO-GENERATED by Flow-Guard /generate — do not edit by hand.
@@ -181,21 +203,54 @@ import { baseConfig } from './playwright.config.base';
 export default defineConfig({
   ...baseConfig,
   testDir: './tests/generated/<ts>',  // replace <ts> with actual timestamp
+  use: {
+    ...baseConfig.use,
+    locale: 'zh-TW',  // read from cases.md locale: field
+    baseURL: '<target>',
+  },
   projects: [
     {
-      name: 'chromium-{role1}',
-      testMatch: /flow\.{role1}\.spec\.ts/,
+      name: 'tsso-setup',
+      testMatch: /playwright[\/\\]setup[\/\\]tsso\.setup\.ts/,
+    },
+    {
+      name: 'mock-user-setup',
+      testMatch: /playwright[\/\\]setup[\/\\]mock-user\.setup\.ts/,
+      dependencies: ['tsso-setup'],
       use: {
-        ...devices['Desktop Chrome'],
-        storageState: 'playwright/.auth/state-{role1}.json',
+        storageState: 'playwright/.auth/tsso-base.json',
       },
     },
-    // repeat for each role
+    // Phase B emits one block per role — replace {role1}, {role2}, … with actual role names
+    {
+      name: 'chrome-manager',                          // ← interpolate actual role name
+      testMatch: /flow\.manager\.spec\.ts/,            // ← interpolate actual role name
+      dependencies: ['mock-user-setup'],
+      use: {
+        channel: 'chrome',
+        storageState: 'playwright/.auth/state-manager.json',  // ← interpolate actual role name
+      },
+    },
+    // repeat one block per additional role
   ],
 });
 ```
 
-No setup projects. No `dependencies`. State files are created by Phase A.
+---
+
+### Step 3 — Write session config
+
+After writing `playwright.config.ts`, also write an identical copy to the session folder:
+
+- Path: `<folder>/playwright.config.session.ts`
+- Content: identical to the regenerated `playwright.config.ts`
+
+This allows targeting a specific historical session without modifying the root config:
+```bash
+npx playwright test --config tests/generated/<ts>/playwright.config.session.ts
+```
+
+`playwright.config.ts` (root) always points to the most recent session and acts as a shortcut for `/test`.
 
 ---
 
@@ -207,6 +262,7 @@ Phase B 完成：
 spec.ts:   <folder>/flow.spec.ts  (N test cases)          ← single-role
            <folder>/flow.{role}.spec.ts per role           ← multi-role
 config:    playwright.config.ts  (updated)
+           <folder>/playwright.config.session.ts  (session copy — use to re-run this session later)
 
 請確認內容後執行：
   /test <folder>

@@ -56,57 +56,14 @@ Read the snapshot YAML. Check the URL and page content:
 Save the base session:
 
 ```bash
-npx playwright-cli state-save playwright/.auth/state.json
+npx playwright-cli state-save playwright/.auth/tsso-base.json
 ```
+
+Per-role state files (`state-{role}.json`) are generated at runtime by the `mock-user-setup` project in the Phase C setup chain — do NOT rebuild them here.
 
 ---
 
-## Step 4 — Rebuild per-role auth state
-
-For each role in `mock-users.json`, rebuild its state file using the stored mechanism:
-
-**urlParam mechanism:**
-```bash
-npx playwright-cli state-load playwright/.auth/state.json
-npx playwright-cli goto "/?{param}={value}"
-# read snapshot YAML — confirm app loaded (not login redirect)
-npx playwright-cli state-save playwright/.auth/state-{role}.json
-```
-
-**localStorage mechanism:**
-```bash
-npx playwright-cli state-load playwright/.auth/state.json
-npx playwright-cli goto "/"
-npx playwright-cli localStorage-set {key} {value}
-npx playwright-cli goto "/"
-# read snapshot YAML — confirm app loaded
-npx playwright-cli state-save playwright/.auth/state-{role}.json
-```
-
-**sessionStorage mechanism:**
-```bash
-npx playwright-cli state-load playwright/.auth/state.json
-npx playwright-cli goto "/"
-npx playwright-cli sessionStorage-set {key} {value}
-npx playwright-cli goto "/"
-# read snapshot YAML — confirm app loaded
-npx playwright-cli state-save playwright/.auth/state-{role}.json
-```
-
-**cookie mechanism:**
-```bash
-npx playwright-cli state-load playwright/.auth/state.json
-npx playwright-cli cookie-add {key} {value}
-npx playwright-cli goto "/"
-# read snapshot YAML — confirm app loaded
-npx playwright-cli state-save playwright/.auth/state-{role}.json
-```
-
-After saving each role file, read the snapshot YAML and confirm the app is loaded (not redirected to login). If any role fails, report it but continue with the remaining roles.
-
----
-
-## Step 5 — Close and summarize
+## Step 4 — Close and summarize
 
 ```bash
 npx playwright-cli close
@@ -118,11 +75,8 @@ Report:
 ✅ Auth 已重新整理
 
 已更新：
-  playwright/.auth/state.json
-  playwright/.auth/state-{role}.json  (一行一個 role)
+  playwright/.auth/tsso-base.json
 
 下一步：
   /test
 ```
-
-If any role state failed, list them under `⚠️ 以下 role 重刷失敗：` so the user knows which roles are unavailable.

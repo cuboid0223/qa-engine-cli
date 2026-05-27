@@ -121,6 +121,8 @@ Also look for:
    - `"sessionStorage"` — `playwright-cli sessionStorage-set {key} {value}`
    - `"cookie"` — `playwright-cli cookie-add {key} {value}`
 
+   > **TSSO is a hard prerequisite.** If the target app does not use TSSO (e.g. it has its own standalone auth), stop immediately and tell the user: `此 engine 僅支援 TSSO 環境，偵測到非 TSSO 驗證機制，無法繼續。` Do not attempt to support credential-based mock users.
+
 ### Step 4 — Write cases.md
 
 **REQUIRED: Invoke the `test-cases` skill via the Skill tool. Do not skip, substitute, or inline this step.**
@@ -131,7 +133,20 @@ Skill("test-cases", args: "target: <target> source: <source> docs: <docs> output
 
 Pass the same `target`, `source`, `docs`, and the resolved `output` path. The skill handles all playwright-cli exploration, saves auth state files to `playwright/.auth/`, and writes `cases.md` to the output path.
 
-**After the skill completes**, read `tests/generated/<ts>/cases.md` and apply the following additional rules if the flow has role-based branching. Rewrite the file with these additions:
+**After the skill completes**, verify two pre-conditions before touching `cases.md`:
+
+**Checkpoint A — Language switch verified:**
+For every role that was logged in and `state-save`'d, confirm the snapshot YAML captured immediately before `state-save` contains a UI element that confirms the correct locale is active (e.g. a language switcher showing `zh-TW`, or page text in the expected language). If no such evidence exists in the snapshot, **stop and report**:
+```
+⚠ 無法確認角色 {role} 的 state-save 前已切換語言至 {locale}。
+請重新執行 /plan 或手動驗證 playwright/.auth/tsso-base.json 的語言狀態。
+```
+Do not silently continue — a wrong-locale state file will cause Phase C assertions to fail with misleading errors.
+
+**Checkpoint B — Locator self-review:**
+Scan every `locator:` line in the newly written `cases.md` against the prohibition list (`.class-name`, xpath `//`, `:nth-child`, `textContent`). Fix any violations in-place before presenting the file to the user. Do not leave bad locators for Phase B to discover.
+
+**Then** read `tests/generated/<ts>/cases.md` and apply the following additional rules if the flow has role-based branching. Rewrite the file with these additions:
 
 - If the flow has multiple roles with different behaviour, generate one TC per role.
 - Each TC is fully self-contained — repeat shared steps in full; do not reference other TCs.

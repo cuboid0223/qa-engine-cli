@@ -24,3 +24,5 @@ await expect(page.getByTestId('user-result-editor'))
 ```
 
 Never use `page.waitForTimeout()` — always use `expect(..., { timeout })` or Playwright's built-in auto-waiting.
+
+> **Constraint:** The `timeout` value in a `wait:` field is a direct override of the global `expect.timeout` (10000 ms). It must be **greater than 10000** — if set to ≤ 10000, the annotation has no effect and should be removed.

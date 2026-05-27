@@ -26,7 +26,7 @@ PHASE C (Run)     → smoke check → npx playwright test → HTML report
 - `/generate` — Phase B only. Generate `spec.ts` from `cases.md`. Stop and wait for user review.
 - `/test` — Phase C only. Run `spec.ts` via Playwright CLI, produce HTML report.
 - `/run` — All three phases in sequence.
-- `/reauth` — Refresh expired TSSO auth state only. Rewrites `playwright/.auth/state*.json` without touching `cases.md`, `spec.ts`, or the session folder. Use when Phase C reports auth expired.
+- `/reauth` — Refresh expired TSSO auth state only. Rewrites `playwright/.auth/tsso-base.json` without touching `cases.md`, `spec.ts`, `mock-user.setup.ts`, or the session folder. Use when Phase C reports auth expired.
 
 ---
 
@@ -73,7 +73,9 @@ Before each phase begins, verify all pre-conditions. If any check fails, stop an
 
 **Phase B (`/generate`)**
 - `cases.md` must exist in the expected timestamped folder
-- `playwright/.auth/state-{role}.json` must exist for **every role** referenced in `cases.md` — missing auth state means Phase A was incomplete; stop and require `/plan` first
+- `cases.md` frontmatter must contain a `locale:` field — if missing, stop: `cases.md 缺少 locale: 欄位，Phase A 未完整執行，請重新執行 /plan。`
+- `playwright/.auth/tsso-base.json` must exist — if missing, Phase A was incomplete; stop and require `/plan` first
+- `playwright/setup/mock-user.setup.ts` must exist — if missing, Phase A was incomplete; stop and require `/plan` first
 - All roles must be explicitly listed — if the role list is ambiguous, stop and ask
 
 **Phase C (`/test`)**
@@ -94,7 +96,7 @@ Before each phase begins, verify all pre-conditions. If any check fails, stop an
 1. **Phase A uses `npx playwright-cli` (via Bash) for exploration.** Start with `npx playwright-cli open <url>`. After each command, playwright-cli auto-outputs a snapshot YAML file path — use the `Read` tool to read that file to inspect the current state. End with `npx playwright-cli close`.
 2. **Use refs from snapshot YAMLs in Phase A only** — to identify elements. Phase B must convert refs to stable selectors (`getByRole`, `getByLabel`, `getByPlaceholder`, `data-testid`). Never put playwright-cli refs directly into spec.ts — they are session-scoped and invalid in CLI runs.
 3. **Never use `npx playwright-cli screenshot`.** It returns base64 data that freezes context. Use the auto-captured snapshot YAML (read via the `Read` tool) only.
-4. **Never modify the user's codebase.** Write only to `tests/generated/`, `playwright/.auth/`, `playwright/mock-users.json`, and `playwright.config.ts`.
+4. **Never modify the user's codebase.** Write only to `tests/generated/`, `playwright/.auth/`, `playwright/mock-users.json`, `playwright/setup/mock-user.setup.ts`, and `playwright.config.ts`.
 5. **Source code is strictly read-only.** When `source:` is provided, you may only read files — never edit, create, or delete anything under that path.
 6. **Credentials come from `.env` only.** Required keys: `TSSO_USERNAME`, `TSSO_PASSWORD`. If missing, stop and tell the user.
 7. **TSSO credentials are not mock user IDs.** `TSSO_USERNAME`/`TSSO_PASSWORD` are for TSSO login during Phase A exploration only. Mock user identifiers (e.g. `mockId`) are separate values provided explicitly in the prompt or read from `playwright/mock-users.json`.
@@ -112,11 +114,14 @@ Before each phase begins, verify all pre-conditions. If any check fails, stop an
 | cases.md | `tests/generated/YYYYMMDD-HHMMSS/cases.md` | Phase A |
 | spec.ts (single-role) | `tests/generated/YYYYMMDD-HHMMSS/flow.spec.ts` | Phase B |
 | spec.ts (multi-role) | `tests/generated/YYYYMMDD-HHMMSS/flow.{role}.spec.ts` | Phase B |
-| Auth state | `playwright/.auth/state.json` | Phase A (`playwright-cli state-save`) |
-| Role auth state | `playwright/.auth/state-{role}.json` | Phase A (`playwright-cli state-save` per role) |
+| TSSO base session | `playwright/.auth/tsso-base.json` | Phase A (`playwright-cli state-save`) |
+| Role auth state | `playwright/.auth/state-{role}.json` | Phase C setup chain (generated at runtime) |
+| Mock user setup script | `playwright/setup/mock-user.setup.ts` | Phase A (generated from mock-users.json) |
 | Mock user cache | `playwright/mock-users.json` | Phase A (write once, reuse) |
-| Playwright config | `playwright.config.ts` | Phase B (AI-managed, do not edit by hand) |
+| Playwright config | `playwright.config.ts` | Phase B (AI-managed, do not edit by hand) — always points to most recent session |
+| Session config | `tests/generated/YYYYMMDD-HHMMSS/playwright.config.session.ts` | Phase B — identical copy scoped to this session; use with `--config` to re-run a specific session |
 | Config base | `playwright.config.base.ts` | Human-maintained |
+| TSSO setup script | `playwright/setup/tsso.setup.ts` | Human-maintained |
 
 The timestamp is set once at Phase A start (Asia/Taipei, UTC+8) and reused across all phases of a run.
 
