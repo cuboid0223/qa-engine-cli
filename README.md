@@ -24,15 +24,20 @@ npx playwright-cli
 
 ```
 tests/generated/<timestamp>/
-    cases.md          ← Phase A：人可讀、可編輯的測試案例
-    flow.spec.ts      ← Phase B：Playwright TypeScript spec（單 role）
-    flow.{role}.spec.ts ← Phase B：Playwright TypeScript spec（多 role）
+    cases.md                     ← Phase A：人可讀、可編輯的測試案例
+    flow.spec.ts                 ← Phase B：Playwright TypeScript spec（單 role）
+    flow.{role}.spec.ts          ← Phase B：Playwright TypeScript spec（多 role）
+    mock-user.setup.ts           ← Phase A：mock user 設定腳本
+    mock-users.json              ← Phase A：mock user 資料（含 baseURL）
+    playwright.config.session.ts ← Phase B：session 專屬設定副本
+    .auth/
+        state-{role}.json        ← Phase C runtime 產生（gitignored）
 
 playwright-report/    ← Phase C：HTML 測試報告（npx playwright show-report）
 test-results/         ← Phase C：JUnit XML + artifacts（自動收集）
 
 playwright/.auth/
-    state-{role}.json ← 各角色登入狀態（gitignored）
+    tsso-base.json    ← TSSO 基礎 session（gitignored，Phase A 產生）
 ```
 
 ---
@@ -49,7 +54,7 @@ flowchart LR
     subgraph A["Phase A — Plan"]
         A1["npx playwright-cli 探索 App\n+ 讀 source / docs"]
         A1 --> A2["cases.md\n（人可讀、可編輯）"]
-        A1 --> A3["state-{role}.json\n（各角色登入狀態）"]
+        A1 --> A3["tsso-base.json\n（TSSO 基礎 session）"]
     end
 
     A2 -->|"人工審查後\n/generate"| B1
@@ -65,7 +70,7 @@ flowchart LR
     B2 -.->|"/run"| C1
 
     subgraph C["Phase C — Test"]
-        C1["smoke check\n+ npx playwright test"]
+        C1["smoke check\n+ setup chain → state-{role}.json\n+ npx playwright test"]
         C1 --> C2["HTML Report"]
     end
 
@@ -74,10 +79,11 @@ flowchart LR
 
 | Phase | 指令 | 輸入 | 輸出 |
 |---|---|---|---|
-| A — Plan | `/plan` | target URL + (source) + (docs) | `cases.md` |
-| B — Generate | `/generate` | `cases.md` | `flow.spec.ts` |
+| A — Plan | `/plan` | target URL + (source) + (docs) + (locale) | `cases.md` + `tsso-base.json` |
+| B — Generate | `/generate` | `cases.md` | `flow.spec.ts` + `playwright.config.ts` |
 | C — Test | `/test` | `flow.spec.ts` | `HTML report` |
 | 全流程 | `/run` | 同 /plan | 上述全部 |
+| 重新登入 | `/reauth` | `.env` 憑證 | `tsso-base.json` |
 
 **為什麼分階段**：拆成三個單一職責的階段，每階段 AI 只需專注做一件事。中間產物可審查、可修改、可重跑。
 
@@ -155,6 +161,16 @@ docs: ./prd.md
 
 ---
 
+### `/reauth` — 重新整理登入狀態
+
+```
+/reauth
+```
+
+當 Phase C 回報 auth 已過期時使用。重新執行 TSSO 登入流程，只覆寫 `playwright/.auth/tsso-base.json`，不動 `cases.md`、`spec.ts`、`mock-user.setup.ts` 或 session 資料夾。
+
+---
+
 ## 輸入參數
 
 | 參數 | 必填 | 說明 |
@@ -162,6 +178,7 @@ docs: ./prd.md
 | `target` | 是 | 測試目標 URL |
 | `source` | 否 | 目標 app 的 source code 目錄（白箱分析） |
 | `docs` | 否 | PRD / spec 的 URL 或本地路徑 |
+| `locale` | 否 | 瀏覽器語系（預設 `zh-TW`） |
 
 ---
 
@@ -171,8 +188,9 @@ docs: ./prd.md
 
 ```bash
 npm install                        # 含 @playwright/cli（playwright-cli 指令）
-npx playwright install chromium
 ```
+
+> **注意：** 不需安裝 Chromium。所有測試使用系統安裝的 Chrome（`channel: 'chrome'`）。
 
 ### 2. 設定憑證
 
@@ -204,23 +222,30 @@ qa-engine/
 │
 ├── .claude/
 │   ├── settings.json             ← 工具白名單（CLI-only）
-│   └── commands/
-│       ├── plan.md               ← /plan
-│       ├── generate.md           ← /generate
-│       ├── test.md               ← /test
-│       ├── run.md                ← /run
-│       └── test-cases.md         ← Phase A 探索邏輯
+│   ├── commands/
+│   │   ├── plan.md               ← /plan
+│   │   ├── generate.md           ← /generate
+│   │   ├── test.md               ← /test
+│   │   ├── run.md                ← /run
+│   │   ├── reauth.md             ← /reauth
+│   │   └── test-cases.md         ← Phase A 探索邏輯
+│   └── rules/                    ← Phase 規則片段（CLAUDE.md @-include）
 │
 ├── playwright/
 │   └── .auth/
-│       └── state-{role}.json     ← 各角色登入狀態（gitignored，Phase A 產生）
+│       └── tsso-base.json        ← TSSO 基礎 session（gitignored，Phase A 產生）
 │
 ├── tests/
 │   └── generated/                ← 每次 /run 自動產生（gitignored）
 │       └── <YYYYMMDD-HHMMSS>/
 │           ├── cases.md
-│           ├── flow.spec.ts          ← 單 role
-│           └── flow.{role}.spec.ts   ← 多 role（一個 role 一個檔）
+│           ├── flow.spec.ts               ← 單 role
+│           ├── flow.{role}.spec.ts        ← 多 role（一個 role 一個檔）
+│           ├── mock-user.setup.ts         ← Phase A 產生
+│           ├── mock-users.json            ← Phase A 產生
+│           ├── playwright.config.session.ts ← Phase B 產生（session 專屬設定副本）
+│           └── .auth/
+│               └── state-{role}.json     ← Phase C runtime 產生（gitignored）
 │
 ├── playwright-report/            ← Playwright HTML 報告（gitignored）
 └── test-results/                 ← Playwright artifacts（gitignored）
