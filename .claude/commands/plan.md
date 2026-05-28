@@ -77,17 +77,7 @@ Also look for:
 
 > **CRITICAL**: NEVER use TSSO credentials (`TSSO_USERNAME` / `TSSO_PASSWORD`) for mock user fields. TSSO credentials are for Phase A browser login only. Mock user IDs are separate values.
 
-1. **Check cache**: if `playwright/mock-users.json` exists, read it.
-   - Compare `baseURL` in the file with the current `target`.
-   - If they **match**: mock mechanism is already known — skip to Step 4.
-   - If they **differ**: stop and ask the user:
-     ```
-     快取的 baseURL 是 <cached baseURL>，但此次 target 是 <target>。
-     是否沿用現有的 mock-users.json？（y/n）
-     ```
-     Wait for confirmation before proceeding. If `n`, treat as if the cache does not exist and continue below.
-
-2. **Determine mechanism** (only if `mock-users.json` does not exist or was rejected):
+1. **Determine mechanism** — each `/plan` run creates a fresh session folder; there is no cache from previous runs.
 
    a. If the prompt explicitly provides role → mockId mapping (e.g. `manager: mockId=1234`), use those values directly.
 
@@ -98,7 +88,7 @@ Also look for:
 
    c. If neither prompt values nor source are available, **ask the user** — do NOT use MCP to discover mock users.
 
-3. **Write `playwright/mock-users.json`** with the resolved mechanism and role→value mapping:
+2. **Write `tests/generated/<ts>/mock-users.json`** with the resolved mechanism and role→value mapping:
 
 ```json
 {
@@ -131,7 +121,7 @@ Also look for:
 Skill("test-cases", args: "target: <target> source: <source> docs: <docs> output: tests/generated/<ts>/cases.md")
 ```
 
-Pass the same `target`, `source`, `docs`, and the resolved `output` path. The skill handles all playwright-cli exploration, saves auth state files to `playwright/.auth/`, and writes `cases.md` to the output path.
+Pass the same `target`, `source`, `docs`, and the resolved `output` path. The skill handles all playwright-cli exploration, saves `playwright/.auth/tsso-base.json`, writes `{session}/mock-users.json` and `{session}/mock-user.setup.ts`, and writes `cases.md` to the output path.
 
 **After the skill completes**, verify two pre-conditions before touching `cases.md`:
 
@@ -154,7 +144,7 @@ Scan every `locator:` line in the newly written `cases.md` against the prohibiti
 - Name each TC with the role in the description: `TC-002: Editor 申請假單`.
 - Do not add branch metadata (e.g. `Branch-of:`) — clear naming is sufficient.
 
-> **Do NOT record the mock-user injection as a TC step.** Mock setup is pre-baked into `playwright/.auth/state-{role}.json` by Phase A. In each TC, write `**Precondition:** mocked as {role}` in the header instead.
+> **Do NOT record the mock-user injection as a TC step.** Mock setup is pre-baked into `{session}/.auth/state-{role}.json` by Phase C's setup chain. In each TC, write `**Precondition:** mocked as {role}` in the header instead.
 
 ### Step 5 — Summary
 

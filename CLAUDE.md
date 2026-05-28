@@ -75,17 +75,18 @@ Before each phase begins, verify all pre-conditions. If any check fails, stop an
 - `cases.md` must exist in the expected timestamped folder
 - `cases.md` frontmatter must contain a `locale:` field — if missing, stop: `cases.md 缺少 locale: 欄位，Phase A 未完整執行，請重新執行 /plan。`
 - `playwright/.auth/tsso-base.json` must exist — if missing, Phase A was incomplete; stop and require `/plan` first
-- `playwright/setup/mock-user.setup.ts` must exist — if missing, Phase A was incomplete; stop and require `/plan` first
+- `{session}/mock-user.setup.ts` must exist in the session folder — if missing, Phase A was incomplete; stop and require `/plan` first
 - All roles must be explicitly listed — if the role list is ambiguous, stop and ask
 
 **Phase C (`/test`)**
 - At least one `flow*.spec.ts` must exist in the expected timestamped folder
 - `playwright.config.ts` must exist and reference valid `storageState` paths
-- Print the `testDir` value from `playwright.config.ts` before running — e.g. `▶ Running session: tests/generated/20260520-135959` — so the user can confirm the correct session is targeted. Do not block on this; proceed unless the user intervenes.
+- Extract the session timestamp from the `testMatch` pattern of the chrome project in `playwright.config.ts` and print it before running — e.g. `▶ Running session: tests/generated/20260520-135959` — so the user can confirm the correct session is targeted. Do not block on this; proceed unless the user intervenes.
 
 **`/reauth`**
 - `.env` must exist and contain `TSSO_USERNAME` + `TSSO_PASSWORD`
-- `playwright/mock-users.json` must exist — if missing, run `/plan` first
+- `playwright.config.ts` must exist — extracts session folder from the chrome project's `testMatch` regex
+- `{session}/mock-users.json` must exist in the session folder — if missing, run `/plan` first
 - `baseURL` in `mock-users.json` must be reachable
 - After each role login, repeat the language switch step (same logic as Phase A rule 11) before `state-save` — the `locale:` value is read from `cases.md` in the current session folder
 
@@ -96,13 +97,13 @@ Before each phase begins, verify all pre-conditions. If any check fails, stop an
 1. **Phase A uses `npx playwright-cli` (via Bash) for exploration.** Start with `npx playwright-cli open <url>`. After each command, playwright-cli auto-outputs a snapshot YAML file path — use the `Read` tool to read that file to inspect the current state. End with `npx playwright-cli close`.
 2. **Use refs from snapshot YAMLs in Phase A only** — to identify elements. Phase B must convert refs to stable selectors (`getByRole`, `getByLabel`, `getByPlaceholder`, `data-testid`). Never put playwright-cli refs directly into spec.ts — they are session-scoped and invalid in CLI runs.
 3. **Never use `npx playwright-cli screenshot`.** It returns base64 data that freezes context. Use the auto-captured snapshot YAML (read via the `Read` tool) only.
-4. **Never modify the user's codebase.** Write only to `tests/generated/`, `playwright/.auth/`, `playwright/mock-users.json`, `playwright/setup/mock-user.setup.ts`, and `playwright.config.ts`.
+4. **Never modify the user's codebase.** Write only to `tests/generated/`, `playwright/.auth/tsso-base.json`, and `playwright.config.ts`.
 5. **Source code is strictly read-only.** When `source:` is provided, you may only read files — never edit, create, or delete anything under that path.
 6. **Credentials come from `.env` only.** Required keys: `TSSO_USERNAME`, `TSSO_PASSWORD`. If missing, stop and tell the user.
-7. **TSSO credentials are not mock user IDs.** `TSSO_USERNAME`/`TSSO_PASSWORD` are for TSSO login during Phase A exploration only. Mock user identifiers (e.g. `mockId`) are separate values provided explicitly in the prompt or read from `playwright/mock-users.json`.
-8. **Mock user mechanism is discovered from source code, not browser automation.** Never use playwright-cli to click through role switchers or mock user UI. If `source:` is not provided and `mock-users.json` does not exist, ask the user for the mechanism.
+7. **TSSO credentials are not mock user IDs.** `TSSO_USERNAME`/`TSSO_PASSWORD` are for TSSO login during Phase A exploration only. Mock user identifiers (e.g. `mockId`) are separate values provided explicitly in the prompt or read from the current session's `mock-users.json`.
+8. **Mock user mechanism is discovered from source code, not browser automation.** Never use playwright-cli to click through role switchers or mock user UI. If `source:` is not provided and no `mock-users.json` exists in the current session folder, ask the user for the mechanism.
 9. **`spec.ts` must contain zero auth logic.** Login, TSSO flow, and mock user switching belong exclusively in `playwright.config.ts` via `storageState`. If a test case appears to require inline login, stop and ask — never write login steps into spec.ts.
-10. **`playwright.config.ts` must use `projects` for multi-role auth.** Each role gets its own project entry pointing to `playwright/.auth/state-{role}.json`. Never use a single global `storageState` when multiple roles exist.
+10. **`playwright.config.ts` must use `projects` for multi-role auth.** Each role gets its own project entry pointing to `tests/generated/YYYYMMDD-HHMMSS/.auth/state-{role}.json`. Never use a single global `storageState` when multiple roles exist.
 11. **Phase A must switch the app language immediately after each role login, before exploration or `state-save` for that role.** After each login succeeds, look for an i18n / language switcher element in the snapshot YAML and click to select the `locale:` value (default `zh-TW`). Repeat this for every role — each `state-save` must capture the language preference. If no switcher is found, print `⚠ 找不到語言切換器，將僅依賴 use.locale: {locale}` (substituting the actual locale value) and continue — Phase B's `use.locale` fallback will handle it. This ensures snapshot text and `cases.md` locator descriptions match the language used during Phase C test runs. Phase A must also write the resolved `locale:` value as a top-level field in `cases.md` so Phase B can read it without requiring the user to re-specify it.
 
 ---
@@ -115,9 +116,9 @@ Before each phase begins, verify all pre-conditions. If any check fails, stop an
 | spec.ts (single-role) | `tests/generated/YYYYMMDD-HHMMSS/flow.spec.ts` | Phase B |
 | spec.ts (multi-role) | `tests/generated/YYYYMMDD-HHMMSS/flow.{role}.spec.ts` | Phase B |
 | TSSO base session | `playwright/.auth/tsso-base.json` | Phase A (`playwright-cli state-save`) |
-| Role auth state | `playwright/.auth/state-{role}.json` | Phase C setup chain (generated at runtime) |
-| Mock user setup script | `playwright/setup/mock-user.setup.ts` | Phase A (generated from mock-users.json) |
-| Mock user cache | `playwright/mock-users.json` | Phase A (write once, reuse) |
+| Role auth state | `tests/generated/YYYYMMDD-HHMMSS/.auth/state-{role}.json` | Phase C setup chain (generated at runtime) |
+| Mock user setup script | `tests/generated/YYYYMMDD-HHMMSS/mock-user.setup.ts` | Phase A (generated from mock-users.json) |
+| Mock user cache | `tests/generated/YYYYMMDD-HHMMSS/mock-users.json` | Phase A (per session) |
 | Playwright config | `playwright.config.ts` | Phase B (AI-managed, do not edit by hand) — always points to most recent session |
 | Session config | `tests/generated/YYYYMMDD-HHMMSS/playwright.config.session.ts` | Phase B — identical copy scoped to this session; use with `--config` to re-run a specific session |
 | Config base | `playwright.config.base.ts` | Human-maintained |

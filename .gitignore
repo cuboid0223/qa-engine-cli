@@ -5,7 +5,7 @@
 
 
 # generated artifacts
-playwright/
+playwright/.auth/
 reports/
 tests/generated/
 test-results/

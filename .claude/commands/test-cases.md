@@ -19,7 +19,7 @@ If `output:` is provided in args, write `cases.md` to that exact path. Otherwise
 
 **2. Auth setup artifacts** — enable Phase C's setup chain:
 - `playwright/.auth/tsso-base.json` — TSSO session only (loaded by mock-user-setup project)
-- `playwright/setup/mock-user.setup.ts` — generated setup script; injects mock user per role and saves `state-{role}.json` at test runtime
+- `{session}/mock-user.setup.ts` — generated setup script; injects mock user per role and saves `{session}/.auth/state-{role}.json` at test runtime
 
 Phase C runs these via a 3-project chain: `tsso-setup → mock-user-setup → chromium-{role}`. Role auth state files are created fresh on each Phase C run, not baked in during Phase A.
 
@@ -77,7 +77,7 @@ For each page in the flow:
 
 ## After Exploring — Generate mock-user.setup.ts
 
-After exploration is complete (and before `npx playwright-cli close`), generate `playwright/setup/mock-user.setup.ts` from the mechanism recorded in `playwright/mock-users.json`.
+After exploration is complete (and before `npx playwright-cli close`), derive the session folder from the `output` arg (e.g. `output: tests/generated/20260528-130118/cases.md` → session folder is `tests/generated/20260528-130118`). Read `{session}/mock-users.json` and generate `{session}/mock-user.setup.ts`.
 
 This file is the Phase C setup chain's second project. It receives the TSSO base session via `storageState` (injected by `playwright.config.ts`) and saves one `state-{role}.json` per role.
 
@@ -91,7 +91,7 @@ import { test as setup } from '@playwright/test';
 setup.describe('mock user setup', () => {
   setup('setup: {role}', async ({ page }) => {
     await page.goto('/?{param}={value}');
-    await page.context().storageState({ path: 'playwright/.auth/state-{role}.json' });
+    await page.context().storageState({ path: '{session}/.auth/state-{role}.json' });
   });
   // repeat for each role
 });
@@ -107,7 +107,7 @@ setup.describe('mock user setup', () => {
     await page.goto('/');
     await page.evaluate(() => localStorage.setItem('{key}', '{value}'));
     await page.reload();
-    await page.context().storageState({ path: 'playwright/.auth/state-{role}.json' });
+    await page.context().storageState({ path: '{session}/.auth/state-{role}.json' });
   });
   // repeat for each role
 });
@@ -123,7 +123,7 @@ setup.describe('mock user setup', () => {
     await page.goto('/');
     await page.evaluate(() => sessionStorage.setItem('{key}', '{value}'));
     await page.reload();
-    await page.context().storageState({ path: 'playwright/.auth/state-{role}.json' });
+    await page.context().storageState({ path: '{session}/.auth/state-{role}.json' });
   });
   // repeat for each role
 });
@@ -142,13 +142,13 @@ setup.describe('mock user setup', () => {
       url: '{baseURL}',
     }]);
     await page.goto('/');
-    await page.context().storageState({ path: 'playwright/.auth/state-{role}.json' });
+    await page.context().storageState({ path: '{session}/.auth/state-{role}.json' });
   });
   // repeat for each role
 });
 ```
 
-Fill in `{param}`, `{value}`, `{key}`, `{baseURL}`, and `{role}` from `mock-users.json`. Generate one `setup(...)` block per role. Write the result to `playwright/setup/mock-user.setup.ts`.
+Fill in `{param}`, `{value}`, `{key}`, `{baseURL}`, `{role}`, and `{session}` (the session folder derived from the `output` arg). Generate one `setup(...)` block per role. Write the result to `{session}/mock-user.setup.ts`.
 
 ## Cases to always generate
 

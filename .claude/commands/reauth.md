@@ -5,7 +5,7 @@ description: Refresh expired TSSO auth state files without touching cases.md or 
 
 # /reauth — Refresh Auth State
 
-You are executing **Auth Refresh**. Your only job is to re-acquire valid TSSO session and rebuild all `playwright/.auth/state*.json` files. You do NOT touch any files under `tests/generated/`, `playwright.config.ts`, or `cases.md`.
+You are executing **Auth Refresh**. Your only job is to re-acquire a valid TSSO session and rewrite `playwright/.auth/tsso-base.json`. You do NOT touch `playwright.config.ts`, `cases.md`, or any files under `tests/generated/`. Per-role state files (`state-{role}.json`) are regenerated automatically by Phase C's setup chain after `tsso-base.json` is refreshed.
 
 ---
 
@@ -14,8 +14,9 @@ You are executing **Auth Refresh**. Your only job is to re-acquire valid TSSO se
 Before doing anything, verify all of the following. If any check fails, stop and tell the user — do not proceed.
 
 1. **`.env` exists** — read it and confirm `TSSO_USERNAME` and `TSSO_PASSWORD` are present and non-empty.
-2. **`playwright/mock-users.json` exists** — this file is the source of truth for roles and mechanisms. If it does not exist, `/plan` has never been run; tell the user to run `/plan` first.
-3. **Target is reachable** — read `baseURL` from `mock-users.json`. Run a connection check via playwright-cli to confirm the target is up.
+2. **`playwright.config.ts` exists** — extract the session folder from the chrome project's `testMatch` regex (e.g. `tests/generated/20260528-130118`).
+3. **`{session}/mock-users.json` exists** — this file is the source of truth for roles and mechanisms. If it does not exist, `/plan` has never been run; tell the user to run `/plan` first.
+4. **Target is reachable** — read `baseURL` from `mock-users.json`. Run a connection check via playwright-cli to confirm the target is up.
 
 ---
 
@@ -29,7 +30,7 @@ Skill("playwright-cli")
 
 ## Step 2 — Read mock-users.json
 
-Read `playwright/mock-users.json`. Extract:
+Extract the session folder from `playwright.config.ts` chrome project `testMatch`. Read `{session}/mock-users.json`. Extract:
 - `baseURL` — the target URL to navigate to
 - `roles` — the full role map (name → mechanism, param, value)
 
@@ -59,7 +60,7 @@ Save the base session:
 npx playwright-cli state-save playwright/.auth/tsso-base.json
 ```
 
-Per-role state files (`state-{role}.json`) are generated at runtime by the `mock-user-setup` project in the Phase C setup chain — do NOT rebuild them here.
+Per-role state files (`{session}/.auth/state-{role}.json`) are regenerated at runtime by the `mock-user-setup` project in the Phase C setup chain — do NOT rebuild them here.
 
 ---
 
