@@ -92,9 +92,11 @@ If `tests/e2e/<slug>/` already exists, promotion is an **update**, not a new flo
 
 ## Hard rules
 
-- **Flake gate first, always.** Only a 3/3-green session may be promoted (run via the
-  session config with `--repeat-each=3`). A test that flakes in the gate never enters
-  the committed suite — quarantine or fix it in the session first.
+- **Flake gate first, always.** Only a 3/3-green session may be promoted — run the gate
+  via the session config with `--repeat-each=3 --retries=0` per `@.claude/rules/flake-gate.md`
+  (retries MUST be off, or a flaky test recovers and hides). A test that flakes in the
+  gate, or any non-empty `quarantine.md`, blocks promotion — quarantine or fix it in the
+  session first.
 - Never commit `.auth/` state. Ensure `.gitignore` has `tests/e2e/*/.auth/`.
 - Promotion is read-only on the source session.
 - The committed suite is what CI runs — never have CI regenerate tests on the fly.

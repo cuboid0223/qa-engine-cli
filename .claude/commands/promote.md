@@ -35,9 +35,10 @@ Stop and use the Clarification Protocol if any fails — do not promote.
 
 ## Steps
 
-1. **Flake gate (non-negotiable).** Run the session 3× and require all green:
+1. **Flake gate (non-negotiable).** Run the passing TCs 3× with retries off and require
+   all green (per `@.claude/rules/flake-gate.md`):
    ```
-   npx playwright test --config tests/generated/<ts>/playwright.config.ts --repeat-each=3
+   npx playwright test --config tests/generated/<ts>/playwright.config.ts --repeat-each=3 --retries=0
    ```
    If any run fails or flakes, **abort promotion** and report which TC was unstable.
    A flaky test must never enter the committed suite.

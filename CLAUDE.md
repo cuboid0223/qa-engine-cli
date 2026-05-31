@@ -42,9 +42,10 @@ source: ../my-app/src             # optional — source code for white-box analy
 docs:   https://notion.so/my-prd  # optional — PRD/spec URL for acceptance criteria
 locale: zh-TW                     # optional — browser locale for Phase A exploration and Phase C runs (default: zh-TW)
 heal:   false                     # optional — /run only: auto-run Phase D on failures (default false; or process.env.AUTO_HEAL)
+gate:   true                      # optional — /test & /run: run the Phase C flake gate (default true; false skips for fast local iteration)
 ```
 
-Acknowledge with one line: `target: ... | source: ... | docs: ... | locale: ... | heal: ...`, then begin immediately.
+Acknowledge with one line: `target: ... | source: ... | docs: ... | locale: ... | heal: ... | gate: ...`, then begin immediately.
 
 ---
 
@@ -92,6 +93,7 @@ Before each phase begins, verify all pre-conditions. If any check fails, stop an
 - At least one `flow*.spec.ts` must exist in the expected timestamped folder
 - The session config `tests/generated/<timestamp>/playwright.config.ts` must exist and reference valid `storageState` paths
 - Always run with `--config tests/generated/<timestamp>/playwright.config.ts` and print the session before running — e.g. `▶ Running session: tests/generated/20260520-135959` — so the user can confirm the correct session is targeted. Do not block on this; proceed unless the user intervenes.
+- Phase C runs in two stages: a functional run, then a **flake gate** on the passing TCs (`--repeat-each=3 --retries=0`) unless `gate: false`. A TC that is not 3/3 is **quarantined**, not green. See `@.claude/rules/flake-gate.md`.
 
 **Phase D (`/heal`)**
 
@@ -105,7 +107,7 @@ Before each phase begins, verify all pre-conditions. If any check fails, stop an
 - The session must have passed Phase C **green** (every TC passed). If Phase C has not run, or has any failure, stop: `本 session 尚未全綠，請先 /test（必要時 /heal）通過後再 promote。`
 - `flow*.spec.ts`, `playwright.config.ts`, `mock-user.setup.ts`, and `mock-users.json` must exist in the session folder.
 - `cases.md` must have a `# Flow:` heading (source of the flow slug) — if absent/ambiguous, stop and ask for the slug.
-- The `--repeat-each=3` flake gate (3/3 green) is mandatory and runs **before** any copy. See `@.claude/rules/phase-e-promote.md`.
+- The flake gate (`--repeat-each=3 --retries=0`, 3/3 green) is mandatory and runs **before** any copy. A non-empty `quarantine.md` or any FAILED TC aborts promotion. See `@.claude/rules/flake-gate.md`.
 
 **`/reauth`**
 
@@ -193,6 +195,12 @@ The timestamp is set once at Phase A start (Asia/Taipei, UTC+8) and reused acros
 ## Test Data Cleanup
 
 @.claude/rules/test-data-cleanup.md
+
+---
+
+## Flake Gate
+
+@.claude/rules/flake-gate.md
 
 ---
 
