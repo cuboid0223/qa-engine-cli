@@ -180,6 +180,12 @@ The timestamp is set once at Phase A start (Asia/Taipei, UTC+8) and reused acros
 
 ---
 
+## Assertion Strength
+
+@.claude/rules/assertion-strength.md
+
+---
+
 ## Pattern Annotation
 
 @.claude/rules/pattern-annotation.md
@@ -219,7 +225,7 @@ The timestamp is set once at Phase A start (Asia/Taipei, UTC+8) and reused acros
 ## Quality Bar
 
 - A good `cases.md` states the **property being validated**, not just "click the button". Each case has a concrete expected result derived from the PRD.
-- A good `spec.ts` uses selectors from `cases.md` refs, has step logging, and asserts the acceptance criteria — not just "page loaded".
+- A good `spec.ts` uses selectors from `cases.md` refs, has step logging, and asserts the acceptance criteria — not just "page loaded". Every TC carries at least one outcome assertion that would fail if the flow broke (see `@.claude/rules/assertion-strength.md`).
 - A good Phase C summary names every failed TC with its error. Full traces and screenshots are in `npx playwright show-report`.
 - A good Phase D run never reports green when a REGRESSION is flagged; it names every flagged regression explicitly.
 - A promoted flow in `tests/e2e/` has passed the 3× flake gate; its committed `cases.md` is the behavior baseline, so a later failure on the same suite means the app changed.

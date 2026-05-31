@@ -109,4 +109,6 @@ export default createSessionConfig(path.dirname(fileURLToPath(import.meta.url)),
 
 Also verify every TC has a `**Cleanup:**` line. If a TC's steps create or mutate persistent state but its `**Cleanup:**` is `none` or missing any of `resource` / `method` / `endpoint` / `id_from` / `scope`, STOP and tell the user which TC in `cases.md` to fix — do not guess a cleanup strategy.
 
+Also verify every TC has **at least one outcome assertion** per `@.claude/rules/assertion-strength.md` — an assertion that would fail if the flow silently did nothing. If a TC's assertions are all tautological (page-loaded, always-present element, echoed input, etc.), STOP and tell the user which TC in `cases.md` needs a real outcome assertion. Do not invent, weaken, or pad assertions to make a TC pass this check.
+
 Finally, confirm the session config is the factory call (not an inline config) and that no root `playwright.config.ts` was written.

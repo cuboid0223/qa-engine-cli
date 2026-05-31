@@ -28,7 +28,7 @@ patterns:
    locator: page.{locatorMethod}(...)
 - {URL 斷言等無 locator 的斷言}
 
-**Cleanup:** scope: {afterEach | afterAll | none} | strategy: {API DELETE /api/...  |  UI 刪除  |  狀態重置  |  none（read-only）} | data: {本 TC 建立或改動的資料；唯讀流程填 none}
+**Cleanup:** resource: {資源名} | method: {DELETE} | endpoint: {/api/.../{id}} | id_from: {捕捉 ID 的變數名} | scope: {afterEach | afterAll}
 
 ---
 
@@ -42,7 +42,7 @@ patterns:
 **Assertions:**
 - ...
 
-**Cleanup:** scope: {afterEach | afterAll | none} | strategy: {...} | data: {...}
+**Cleanup:** none（read-only）
 
 ---
 ````
@@ -55,9 +55,17 @@ patterns:
 - TC title format: `## TC-{NNN}: {動詞}+{受詞}+{預期結果}` — the title alone must convey what property is being validated
 - Each TC block ends with `---`
 
+**Assertion rules (enforced):**
+- Every TC must include **at least one outcome assertion** bound to the `{預期結果}` in its title — one that would FAIL if the flow silently did nothing or did the wrong thing. See `@.claude/rules/assertion-strength.md`.
+- A "page loaded" check, visibility of an always-present element (nav/logo/header), or asserting an input value right after typing it does **not** satisfy this. Those may appear as intermediate checks, but each TC needs one real consequence check (created item appears, specific success text, status/count/URL change, persistence after reload).
+
 **Cleanup rules (enforced):**
-- `Cleanup` is **mandatory** for every TC. A read-only flow must write `strategy: none（read-only）` — never leave it blank.
-- Prefer **API / DB cleanup over UI deletion**. UI teardown is itself a flaky flow and can pollute the next test. Only fall back to `UI 刪除` when no API/DB path exists.
-- When `source:` is provided, Phase A must resolve the **actual cleanup endpoint / mechanism** from the source code and name it explicitly (e.g. `API DELETE /api/leave/{id}`), not a placeholder.
-- `scope`: use `afterEach` for per-test isolation (default for any TC that creates data); `afterAll` only when the whole file deliberately shares fixture data; `none` only for read-only TCs.
-- The `Cleanup` line is **declarative intent** — Phase B generates the actual `afterEach`/`afterAll` teardown from this field per `@.claude/rules/test-data-cleanup.md`. Phase B must not invent a cleanup strategy that is not declared here.
+- `Cleanup` is **mandatory** for every TC and is a single pipe-delimited line, same style as `Precondition`.
+- A TC that **creates or mutates persistent state** must declare all five fields: `resource` | `method` | `endpoint` | `id_from` | `scope`. These map 1:1 to what Phase B needs to emit the teardown (see `@.claude/rules/test-data-cleanup.md`).
+  - `id_from`: the variable name the test will assign the created resource's ID to (e.g. `createdTaskId`).
+  - `endpoint`: use `{id}` as the placeholder Phase B substitutes (e.g. `/api/tasks/{id}`).
+  - `scope`: `afterEach` (default — per-test isolation) or `afterAll` (only when the whole file deliberately shares fixture data).
+- A **read-only** TC must write exactly `**Cleanup:** none（read-only）` — never leave it blank.
+- Prefer **API / DB cleanup over UI deletion** (UI teardown is itself a flaky flow). Only use a UI-based `method` when no API path exists; in that case put the deletion locator in `endpoint` as `UI: <locator>`.
+- When `source:` is provided, Phase A must resolve the **actual** endpoint/method from the source code — never a placeholder.
+- The `Cleanup` line is **declarative intent**; Phase B generates the real `afterEach`/`afterAll` from it and must not invent a strategy that is not declared here.
