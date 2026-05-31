@@ -15,7 +15,7 @@ import path from 'node:path';
  */
 
 // ---- Shared defaults (NO `as const` -- it breaks reporter/array typing) -----
-const SHARED = {
+export const SHARED = {
   timeout: 30_000,
   expect: { timeout: 10_000 },
   retries: process.env.CI ? 2 : 1,          // enables Playwright flaky detection
