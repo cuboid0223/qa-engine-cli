@@ -119,7 +119,7 @@ Before each phase begins, verify all pre-conditions. If any check fails, stop an
 
 ## Core Rules
 
-1. **Phase A uses `npx playwright-cli` (via Bash) for exploration.** Start with `npx playwright-cli open <url>`. After each command, playwright-cli auto-outputs a snapshot YAML file path — use the `Read` tool to read that file to inspect the current state. End with `npx playwright-cli close`.
+1. **Phase A uses `npx playwright-cli` (via Bash) for exploration.** Start with `npx playwright-cli open <url>`. After each command, playwright-cli auto-outputs a snapshot YAML file path — inspect it by **grepping for the element you need** (prefer `snapshot -i` + the `Grep` tool over reading the whole YAML, which is the main Phase A token cost). End with `npx playwright-cli close`. See `@.claude/rules/phase-a-explore.md`.
 2. **Use refs from snapshot YAMLs in Phase A and Phase D only** — to identify elements. Phase B (and any Phase D edit) must convert refs to stable selectors (`getByRole`, `getByLabel`, `getByPlaceholder`, `data-testid`). Never put playwright-cli refs directly into spec.ts — they are session-scoped and invalid in CLI runs.
 3. **Never use `npx playwright-cli screenshot`.** It returns base64 data that freezes context. Use the auto-captured snapshot YAML (read via the `Read` tool) only.
 4. **Never modify the user's codebase.** Write only to `tests/generated/`, `tests/e2e/` (Phase E), the global seed `playwright/.auth/tsso-base.json` (via `/reauth` only), and the per-session config inside `tests/generated/<timestamp>/`.
@@ -157,6 +157,12 @@ Before each phase begins, verify all pre-conditions. If any check fails, stop an
 | TSSO setup script        | `playwright/setup/tsso.setup.ts`                           | Human-maintained                                                |
 
 The timestamp is set once at Phase A start (Asia/Taipei, UTC+8) and reused across all phases of a run.
+
+---
+
+## Phase A Exploration
+
+@.claude/rules/phase-a-explore.md
 
 ---
 
