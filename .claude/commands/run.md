@@ -13,8 +13,7 @@ Runs the phases in sequence with a mandatory human review pause between Phase A 
 
 ```
 target: <url>
-source: <dir>    # optional — white-box analysis
-docs: <url>      # optional — PRD / spec
+docs: <url>      # optional — PRD / spec, used ONLY as an oracle (tag [prd]/[baseline] + flag conflicts)
 heal: false      # optional — auto-run Phase D on failures; default false (or process.env.AUTO_HEAL)
 ```
 

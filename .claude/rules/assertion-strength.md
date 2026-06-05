@@ -54,11 +54,25 @@ the "at least one outcome assertion" requirement.
 
 ---
 
+## Baseline (characterization) assertions still count
+
+An assertion tagged `[baseline]` (see `@.claude/rules/cases-template.md` Oracle rules) is a
+**characterization** assertion: it snapshots the behavior Phase A actually observed on the
+target, with no spec to confirm that behavior is *correct*. This is fully compatible with
+the strength bar above — a baseline assertion must still pass the core test (it would FAIL
+if the flow broke). The oracle tag only records *why we believe the expected value*
+(`[prd]` = spec-backed; `[baseline]` = observed-only); it never lowers the strength bar.
+An observed-only expected value is exactly what this rule already requires (the asserted
+value originates from the app's response, never the literal input).
+
+---
+
 ## Enforcement points
 
 - **Phase A** writes the outcome assertion into each TC's `Assertions` section
   (see `@.claude/rules/cases-template.md`) — the `{預期結果}` in the title must be backed
-  by a concrete assertion, not just a navigation/visibility check.
+  by a concrete assertion **derived from the observed target behavior** (never an
+  unobserved spec claim), and tagged `[prd]`/`[baseline]` per the Oracle rules.
 - **Phase B** validates: for every TC, confirm ≥1 assertion passes the core test above.
   If a TC's assertions are all on the prohibition list, **stop and name the TC** — tell the
   user which TC in `cases.md` needs a real outcome assertion. Phase B must not invent one

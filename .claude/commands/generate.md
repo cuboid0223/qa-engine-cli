@@ -24,10 +24,11 @@ Or runs without argument — use the most recently modified folder under `tests/
 
 Before writing any code, read these files in order to internalize assertion patterns, waiting strategy, and test structure requirements:
 
-1. `.claude/skills/playwright-skill/core/assertions-and-waiting.md`
-2. `.claude/skills/playwright-skill/core/forms-and-validation.md`
-3. `.claude/skills/playwright-skill/core/flaky-tests.md`
-4. `.claude/skills/playwright-skill/core/test-data-management.md`
+1. `.claude/rules/phase-b-generate.md` — authoritative Phase B rules (locator/prohibition/cleanup checks **and the oracle self-review**: every assertion must carry `[prd]`/`[baseline]`, and each `[baseline]` gets a `// ORACLE: baseline` comment in spec.ts)
+2. `.claude/skills/playwright-skill/core/assertions-and-waiting.md`
+3. `.claude/skills/playwright-skill/core/forms-and-validation.md`
+4. `.claude/skills/playwright-skill/core/flaky-tests.md`
+5. `.claude/skills/playwright-skill/core/test-data-management.md`
 
 ---
 
@@ -107,7 +108,7 @@ test.describe('<flow name>', () => {
     console.log('TC-001 Step 1: navigate to target');
     await page.goto('/');
     // steps from cases.md
-    // assertions from Acceptance Criteria
+    // assertions from cases.md (observed-only; each [baseline] one gets a `// ORACLE: baseline` comment)
   });
 });
 
@@ -118,7 +119,7 @@ test.describe('[manager] <flow name>', () => {
     console.log('TC-001 Step 1: navigate to target');
     await page.goto('/');
     // steps from cases.md — all steps self-contained, no shared helpers
-    // assertions from Acceptance Criteria
+    // assertions from cases.md (observed-only; each [baseline] one gets a `// ORACLE: baseline` comment)
   });
 });
 ```

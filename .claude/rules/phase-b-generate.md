@@ -45,7 +45,7 @@ If `patterns:` is absent or empty, skip this step and proceed with the 6 static 
 4. `getByPlaceholder()` — inputs without label
 5. `getByAltText()` — images
 6. `getByTitle()` — title attribute
-7. `getByTestId()` — only when `data-testid` is confirmed present in the source
+7. `getByTestId()` — only when `data-testid` is confirmed present on the live element (Phase A verifies via `playwright-cli eval "el => el.getAttribute('data-testid')"`)
 8. `locator('[attr="value"]')` — stable attribute selectors only (last resort)
 
 **Prohibition list — these patterns must not appear in `spec.ts`:**
@@ -110,5 +110,13 @@ export default createSessionConfig(path.dirname(fileURLToPath(import.meta.url)),
 Also verify every TC has a `**Cleanup:**` line. If a TC's steps create or mutate persistent state but its `**Cleanup:**` is `none` or missing any of `resource` / `method` / `endpoint` / `id_from` / `scope`, STOP and tell the user which TC in `cases.md` to fix — do not guess a cleanup strategy.
 
 Also verify every TC has **at least one outcome assertion** per `@.claude/rules/assertion-strength.md` — an assertion that would fail if the flow silently did nothing. If a TC's assertions are all tautological (page-loaded, always-present element, echoed input, etc.), STOP and tell the user which TC in `cases.md` needs a real outcome assertion. Do not invent, weaken, or pad assertions to make a TC pass this check.
+
+Also verify every assertion in `cases.md` carries an oracle tag (`[prd]` or `[baseline]`, per `@.claude/rules/cases-template.md`). If any assertion is missing its tag, STOP and tell the user which assertion in `cases.md` to fix — do not guess or default a tag. For every `[baseline]` assertion (including conflict variants `[baseline ⚠ ...]`), append a trailing comment on its `expect(...)` line in `spec.ts` so the characterization is visible in code review:
+
+```ts
+await expect(page.getByRole('row').filter({ hasText: taskName })).toBeVisible(); // ORACLE: baseline — captured behavior, not spec
+```
+
+`[prd]` assertions get no comment. Do not let the oracle tag change the assertion itself — it only annotates; the expected value still comes verbatim from `cases.md`.
 
 Finally, confirm the session config is the factory call (not an inline config) and that no root `playwright.config.ts` was written.

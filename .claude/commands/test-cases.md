@@ -1,6 +1,6 @@
 ---
 name: test-cases
-description: Generate human-readable test cases for a user flow by exploring the target via npx playwright-cli (Bash/CLI only, never MCP) and extracting acceptance criteria from source and docs.
+description: Generate human-readable test cases for a user flow by exploring the target via npx playwright-cli (Bash/CLI only, never MCP); expected values are observed-only, with docs used solely as an oracle to tag [prd]/[baseline] and flag conflicts.
 ---
 
 # Test Cases Skill
@@ -72,6 +72,8 @@ For each page in the flow:
 4. Note any visible validation messages or error states
 5. To interact: `npx playwright-cli click <ref>`, `npx playwright-cli fill <ref> "<text>"` — each command auto-outputs a new snapshot YAML path; read it to see the result. **The Bash stdout also contains the generated Playwright code (e.g. `await page.getByRole('button', { name: 'Submit' }).click()`). Capture this line for every action — it is the confirmed stable locator.**
 6. For elements you only observe but never click/fill (assertion targets such as result banners, role badges, error messages): run `npx playwright-cli generate-locator <ref> --raw` immediately after the snapshot, before navigating away. Record the output as the stable locator for that element.
+7. **When a step creates persistent state**, capture its cleanup endpoint from the network — right after the create action, run `npx playwright-cli requests` then `npx playwright-cli request <n>` to read the real POST method/URL and grab the created ID from the response. See `@.claude/rules/phase-a-explore.md` §7.
+8. **Tag every assertion's oracle** as you record it: `[prd]` if the observed behavior matches a `docs:` statement, `[baseline]` if `docs:` is silent (or absent), `[baseline ⚠ PRD 不符：PRD 寫 X]` if `docs:` contradicts what you observed. Expected values are always the observed value — never an unobserved spec claim. See `@.claude/rules/phase-a-explore.md` §8 and `@.claude/rules/cases-template.md` Oracle rules.
 
 **Budget**: max 8 navigations total (including the initial auth navigation). This applies to exploration only — per-role state-saves in the next section are not counted.
 
@@ -157,11 +159,7 @@ Fill in `{param}`, `{value}`, `{key}`, `{baseURL}`, `{role}`, and `{session}` (t
 | Happy path | Complete flow with valid inputs → expect success state |
 | Required field validation | Submit with empty required fields → expect error messages |
 | Navigation | Each step correctly navigates to the next page |
-| End state | Final page/state matches expected outcome from PRD |
-
-If `source` is provided, also add:
-- Boundary cases for validated fields (min/max length, format constraints)
-- Permission checks for protected routes
+| End state | Final page/state matches the observed expected outcome |
 
 If `docs` is provided:
 - One case per business invariant extracted from the PRD
@@ -196,11 +194,13 @@ patterns:
    locator: page.getByRole('button', { name: '<label>' })
 
 **Assertions:**
-- <what to assert>
+- <what to assert> [baseline]
    locator: page.getByTestId('<testid>')
-- <URL check or assertion without locator>
+- <URL check or assertion without locator> [prd]
 
 ---
 ```
+
+Every assertion bullet must end with an oracle tag (`[prd]` / `[baseline]`, or a conflict variant `[baseline ⚠ PRD 不符：…]`) per `.claude/rules/cases-template.md` Oracle rules. With no `docs:`, every assertion is `[baseline]`.
 
 Do **not** add `Expected Result:` or `Acceptance Criteria:` sections — these are forbidden by the template.

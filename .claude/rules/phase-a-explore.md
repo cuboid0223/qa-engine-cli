@@ -73,3 +73,39 @@ if you need to grep it again.
 | Confirm an assertion's static text    | full `snapshot` + `Grep` for that text         | reading the whole tree         |
 | Read around a matched line            | `Read` with a small `view_range` / `sed -n`    | `Read` the entire file         |
 | Verify visual state                   | (not needed — never screenshot, see Rule 3)    | `playwright-cli screenshot`    |
+
+## 7. Capture cleanup endpoints by observing the network
+
+There is no `source:` input — Phase A learns the app only by driving it. When a step
+**creates persistent state**, resolve its cleanup endpoint from the request the app
+actually fires, not from any source code:
+
+```
+# right after the create action, list recent requests and inspect the POST
+npx playwright-cli requests
+npx playwright-cli request <n>      # method + URL + response body (grab the created ID)
+```
+
+Write the observed `POST` method/URL and the ID source into the TC's `**Cleanup:**` line,
+and derive the `DELETE` endpoint from the observed create endpoint by REST convention
+(`POST /api/tasks` → `DELETE /api/tasks/{id}`). If the DELETE shape can't be derived
+cleanly, stop and ask the user (Clarification Protocol). See
+`@.claude/rules/cases-template.md` and `@.claude/rules/test-data-cleanup.md`.
+
+To confirm a `data-testid` exists (before Phase B may use `getByTestId`), ask the live
+element — do not look for source:
+
+```
+npx playwright-cli eval "el => el.getAttribute('data-testid')" e5
+```
+
+## 8. Tag every assertion's oracle while exploring
+
+Expected values are **observed-only** — write what you actually saw. As you record each
+assertion, also tag its oracle (see `@.claude/rules/cases-template.md` Oracle rules):
+
+- The observed behavior matches a `docs:` statement → `[prd]`.
+- `docs:` is silent on it (or no `docs:` was provided at all) → `[baseline]`.
+- `docs:` contradicts what you observed → write the observed value, tag
+  `[baseline ⚠ PRD 不符：PRD 寫 {規格說的}]`, and **keep going** — a conflict never blocks
+  Phase A; it is surfaced for the human at review / promote.

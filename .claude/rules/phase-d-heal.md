@@ -22,7 +22,7 @@ is to tell whether that signal is "the test drifted" (fix it) or "the app broke"
 - Adding `test.skip`, `test.fixme`, `.catch()`, `try/catch` swallowing, or `.first()`
   to dodge a strict-mode violation that signals a real ambiguity.
 - Inserting fixed `waitForTimeout` / `sleep` to paper over flakiness.
-- Editing auth logic, `playwright.config.ts` projects, or anything under `source:`.
+- Editing auth logic or `playwright.config.ts` projects.
 
 If a fix would require any forbidden edit, the correct action is **flag**, not edit.
 
@@ -88,19 +88,28 @@ default to **REGRESSION + ask**. A false "healed" is far more dangerous than a f
 ```
 ## Heal summary — tests/generated/<timestamp>
 
-| TC      | Class        | Action             | Detail                                   |
-| ------- | ------------ | ------------------ | ---------------------------------------- |
-| TC-001  | DRIFT        | healed             | getByText('送出') → getByRole('button', { name: '提交' }) |
-| TC-003  | REGRESSION   | flagged            | 申請後預期 success toast,實際出現「系統錯誤」— 疑似真 bug |
-| TC-004  | FLAKE        | healed             | 加 waitForResponse('**/api/leave') 取代固定等待 |
-| TC-006  | TEST-DEFECT  | flagged            | 斷言文字在乾淨建置也不符,Phase B 生成錯誤,需人工 |
-| TC-007  | AUTH/ENV     | deferred           | state-manager.json 401,請執行 /reauth |
+| TC      | Class        | Action             | Oracle     | Detail                                   |
+| ------- | ------------ | ------------------ | ---------- | ---------------------------------------- |
+| TC-001  | DRIFT        | healed             | —          | getByText('送出') → getByRole('button', { name: '提交' }) |
+| TC-003  | REGRESSION   | flagged            | [prd]      | 申請後預期 success toast,實際出現「系統錯誤」— 違反規格,疑似真 bug |
+| TC-004  | FLAKE        | healed             | —          | 加 waitForResponse('**/api/leave') 取代固定等待 |
+| TC-005  | REGRESSION   | flagged            | [baseline] | 列表排序與基準不同;PRD 未規範,需人判 intended-change vs regression |
+| TC-006  | TEST-DEFECT  | flagged            | [prd]      | 斷言文字在乾淨建置也不符,Phase B 生成錯誤,需人工 |
+| TC-007  | AUTH/ENV     | deferred           | —          | state-manager.json 401,請執行 /reauth |
 
 Re-run (healed only, 3×): 2 passed / 0 flaky
 Patch: tests/generated/<timestamp>/heal-<HHMMSS>.patch
-Regressions flagged: 1 (TC-003) — 需人工確認是否為真實 bug
+Regressions flagged: 2 (TC-003, TC-005) — 需人工確認是否為真實 bug
 Full traces: npx playwright show-report
 ```
+
+The `Oracle` column carries the tag of the **failing assertion** (from `cases.md`), for
+TCs where an assertion failed (`—` for locator/wait/auth failures). It is **triage
+context only** and never changes classification: a `[prd]` failure is a strong
+spec-violation signal; a `[baseline]` failure means the behavior changed with no spec to
+arbitrate — both still follow the decision tree, and the tie-breaker (default REGRESSION
+when DRIFT vs REGRESSION is unclear, per core rule 12) is unchanged. The tag must not be
+used to soften, dismiss, or auto-heal a `[baseline]` failure.
 
 A run with any `REGRESSION` row **must not** be reported as green. The exit message
 names every flagged regression explicitly — that is the product of the guard.

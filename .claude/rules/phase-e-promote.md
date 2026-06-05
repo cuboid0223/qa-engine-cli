@@ -79,6 +79,25 @@ target-version: <git SHA / build of the app under test, if recorded in session m
 
 ---
 
+## Oracle / baseline approval
+
+A promoted flow becomes the permanent correctness baseline, so promotion is the moment a
+human declares its captured behavior *correct*. The oracle tags (`@.claude/rules/cases-template.md`)
+make explicit which assertions actually have a spec behind them and which are pure
+characterization.
+
+- **The promote report must list every `[baseline]` assertion** in the flow (TC id +
+  assertion), and list every **conflict** (`[baseline ⚠ PRD 不符：…]`) in a separate,
+  prominent section. Compute these by scanning the session's `cases.md` — there is no
+  TC-level oracle field to read.
+- Print the line: **「按下 promote = 你宣告以下 baseline 現狀為正確基準」**, then the list.
+  The human must pass over it. `[prd]` assertions need no sign-off (the spec already backs
+  them); `[baseline]` ones are being blessed *now*.
+- **Never auto-promote**, and never silently promote a flow that is all-`[baseline]` or has
+  unresolved conflicts — surface them and let the human decide. Conflicts are **surfaced,
+  not blocking**: a `⚠` does not abort promotion (the flake gate is the only hard gate),
+  but it must be shown so the human knows the spec and the app disagree on that assertion.
+
 ## Re-promotion (update) semantics
 
 If `tests/e2e/<slug>/` already exists, promotion is an **update**, not a new flow:
@@ -87,6 +106,10 @@ If `tests/e2e/<slug>/` already exists, promotion is an **update**, not a new flo
   record of how the validated behavior changed. Surface a 1-line summary in the report.
 - This is the regression-guard audit trail — reviewers approve behavior changes via the
   PR diff, exactly like reviewing source code.
+- A changed **`[prd]`** assertion means the app diverged from the spec — call it out.
+  A changed **`[baseline]`** assertion has no spec to arbitrate, so the reviewer alone
+  judges intended-change vs regression from the diff; flag baseline-line diffs explicitly
+  in the 1-line summary so they are not rubber-stamped.
 
 ---
 

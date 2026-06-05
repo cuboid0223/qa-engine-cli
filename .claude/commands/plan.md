@@ -1,6 +1,6 @@
 ---
 name: plan
-description: Phase A — Explore target via npx playwright-cli (Bash/CLI only, never MCP), read source and docs, generate cases.md and save auth state files.
+description: Phase A — Explore target via npx playwright-cli (Bash/CLI only, never MCP), read docs (optional oracle), generate cases.md and save auth state files.
 ---
 
 # /plan — Phase A: Generate cases.md
@@ -15,8 +15,7 @@ You do NOT generate spec.ts here. You do NOT run tests.
 
 ```
 target: <url>          # required
-source: <dir>          # optional — source code path
-docs: <url>            # optional — PRD/spec URL for acceptance criteria
+docs: <url>            # optional — PRD/spec URL or local path, used ONLY as an oracle (tag [prd]/[baseline] + flag conflicts), never as an assertion source
 ```
 
 ---
@@ -59,21 +58,7 @@ If `docs` is given, check the format first:
 
 Format extracted items as a numbered list — these drive case generation directly.
 
-### Step 3 — Read source (if provided)
-
-If `source` is given, read up to 8 files in this priority order:
-1. Route/controller files
-2. Schema/DTO/validation files
-3. Auth/permission files
-
-Extract: all routes, validated fields with constraints, permission checks.
-
-Also look for:
-- Role enums or constants (e.g. `MANAGER`, `EMPLOYEE`, `ADMIN`)
-- Role-check logic (e.g. `if user.role === 'manager'`)
-- Role-switch mechanism: URL params (e.g. `?mockuserid=`, `?role=`) or UI components (role switcher, avatar dropdown)
-
-### Step 3.5 — Mock user resolution
+### Step 3 — Mock user resolution
 
 > **CRITICAL**: NEVER use TSSO credentials (`TSSO_USERNAME` / `TSSO_PASSWORD`) for mock user fields. TSSO credentials are for Phase A browser login only. Mock user IDs are separate values.
 
@@ -81,12 +66,9 @@ Also look for:
 
    a. If the prompt explicitly provides role → mockId mapping (e.g. `manager: mockId=1234`), use those values directly.
 
-   b. If `source:` is provided, grep for mock patterns to determine the mechanism type:
-      - URL param: search for `mockId`, `mockuserid`, `impersonat`, `switchRole` in middleware or `getServerSideProps`
-      - localStorage: search for `localStorage.setItem` or `sessionStorage.setItem` inside role-switch components
-      - API: search for `POST /api/mock` or similar in role-switch handlers
+   b. Otherwise, if a `mock-users.json` was supplied for this session, read the mechanism and mapping from it.
 
-   c. If neither prompt values nor source are available, **ask the user** — do NOT use MCP to discover mock users.
+   c. If neither prompt values nor a `mock-users.json` are available, **ask the user** for the mechanism and role→value mapping — do NOT grep source, click through a role switcher, or use MCP to discover mock users.
 
 2. **Write `tests/generated/<ts>/mock-users.json`** with the resolved mechanism and role→value mapping:
 
@@ -118,10 +100,10 @@ Also look for:
 **REQUIRED: Invoke the `test-cases` skill via the Skill tool. Do not skip, substitute, or inline this step.**
 
 ```
-Skill("test-cases", args: "target: <target> source: <source> docs: <docs> output: tests/generated/<ts>/cases.md")
+Skill("test-cases", args: "target: <target> docs: <docs> output: tests/generated/<ts>/cases.md")
 ```
 
-Pass the same `target`, `source`, `docs`, and the resolved `output` path. The skill handles all playwright-cli exploration, saves `playwright/.auth/tsso-base.json`, writes `{session}/mock-users.json` and `{session}/mock-user.setup.ts`, and writes `cases.md` to the output path.
+Pass the same `target`, `docs`, and the resolved `output` path. The skill handles all playwright-cli exploration, saves `playwright/.auth/tsso-base.json`, writes `{session}/mock-users.json` and `{session}/mock-user.setup.ts`, and writes `cases.md` to the output path.
 
 **After the skill completes**, verify two pre-conditions before touching `cases.md`:
 

@@ -71,7 +71,7 @@ flowchart LR
 
 | Phase        | 指令          | 輸入                                        | 輸出                                                |
 | ------------ | ----------- | ----------------------------------------- | ------------------------------------------------- |
-| A — Plan     | `/plan`     | target + (source) + (docs) + (locale)     | `cases.md`                                        |
+| A — Plan     | `/plan`     | target + (docs) + (locale)                | `cases.md`                                        |
 | B — Generate | `/generate` | `cases.md`                                | `flow.spec.ts` + session `playwright.config.ts`   |
 | C — Test     | `/test`     | `flow.spec.ts`                            | HTML report + JUnit + (quarantine.md)             |
 | D — Heal     | `/heal`     | Phase C 失敗結果                            | 修好的 spec.ts + heal 報告 + `.patch`              |
@@ -90,11 +90,10 @@ flowchart LR
 ```
 /plan
 target: http://localhost:3000
-source: ../my-app/src    # optional — 白箱分析
-docs: ./prd.md           # optional — PRD / spec
+docs: ./prd.md           # optional — PRD / spec，僅作 oracle（貼 [prd]/[baseline] 標籤 + flag 衝突）
 ```
 
-透過 `npx playwright-cli` 瀏覽目標 app，結合 source 與 PRD 產生 `cases.md`，完成後等候審查。探索採省 token 紀律：預設 `snapshot -i`（只回互動元素）、用 grep 找元素而非整份讀、每條 flow 設探索上限（見 `phase-a-explore.md`）。
+透過 `npx playwright-cli` 瀏覽目標 app，**只把實際觀察到的行為**寫進 `cases.md`（observed-only），`docs` 僅用來替觀察到的斷言貼 oracle 標籤、並 flag 與 PRD 的衝突——絕不注入畫面上沒有的斷言。探索採省 token 紀律：預設 `snapshot -i`（只回互動元素）、用 grep 找元素而非整份讀、每條 flow 設探索上限（見 `phase-a-explore.md`）。
 
 ### `/generate` — Phase B：cases.md → spec.ts
 
@@ -139,7 +138,6 @@ setup chain 依序 `tsso-setup → mock-user-setup → chrome[-role]`。結果�
 ```
 /run
 target: http://localhost:3000
-source: ../my-app/src
 docs: ./prd.md
 heal: true            # optional — Phase C 有失敗時自動接 Phase D（預設 false）
 gate: true            # optional — 跑 Phase C flake gate（預設 true；false 給快速迭代）
@@ -158,11 +156,14 @@ gate: true            # optional — 跑 Phase C flake gate（預設 true；fals
 | 參數       | 必填 | 說明                                            |
 | -------- | --- | --------------------------------------------- |
 | `target` | 是  | 測試目標 URL（亦可由 `TARGET_URL` 提供）                 |
-| `source` | 否  | 目標 app 的 source code 目錄（白箱分析，唯讀）             |
-| `docs`   | 否  | PRD / spec 的 URL 或本地路徑                        |
+| `docs`   | 否  | PRD / spec 的 URL 或本地路徑——**僅作 oracle**：替觀察到的斷言貼 `[prd]`/`[baseline]` 標籤、flag 衝突，不作為斷言來源 |
 | `locale` | 否  | 瀏覽器語系（預設 `zh-TW`）                             |
 | `heal`   | 否  | `/run`：失敗時自動跑 Phase D（預設 false / `AUTO_HEAL`） |
 | `gate`   | 否  | `/test` `/run`：跑 Phase C flake gate（預設 true）  |
+
+> **沒有 `source` 參數。** Flow-Guard 是 regression guard：它只把 target 上**實際觀察到**的行為寫成斷言（observed-only），所以 `cases.md` 永遠對得上畫面。cleanup endpoint 由 Phase A 觀察建立資料時送出的網路請求取得（`playwright-cli requests`），不讀原始碼。
+>
+> **Oracle（`[prd]` vs `[baseline]`）**：每條斷言記錄「我們為何相信這個預期值」。`[prd]` = 有 `docs:` 規格背書（帶正確性份量）；`[baseline]` = 規格沒寫，只是現狀快照（只保證沒變、不保證對）。沒給 `docs:` → 全部 `[baseline]`。規格與現狀衝突時寫觀察值並標 `[baseline ⚠ PRD 不符]`，不卡流程。「現狀是否正確」的判斷集中在 `/promote`：報告會列出所有 `[baseline]` 斷言,**按下 promote = 宣告這些現狀為正確基準**。這正好補上 PRD 落後（PM 不一定更新）時缺的那塊。
 
 ---
 
