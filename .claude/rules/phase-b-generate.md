@@ -35,7 +35,7 @@ If `patterns:` is absent or empty, skip this step and proceed with the 6 static 
 
 **Locator quality standard — enforced by Phase A, verified by Phase B:**
 
-`cases.md` `locator:` values (indented under each step or assertion) must conform to this priority order. Phase B copies them verbatim from `cases.md`. If Phase B encounters a `locator:` value that violates the prohibition list below, stop and tell the user which line in `cases.md` to fix — do not silently rewrite it.
+`cases.md` `locator:` values (indented under each step or assertion) must conform to this priority order. Phase A produces them with `generate-locator <ref> --raw` against the live element (see `@.claude/rules/phase-a-explore.md` Rule 5), so they should already be canonical; Phase B still scans every one as a second line of defense. Phase B copies them verbatim from `cases.md`. If Phase B encounters a `locator:` value that violates the prohibition list below, stop and tell the user which line in `cases.md` to fix — do not silently rewrite it.
 
 **Locator priority (strict — use first that applies):**
 

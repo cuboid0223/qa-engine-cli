@@ -58,18 +58,43 @@ grep for one element, not a full re-read of the page.
   Protocol) rather than exploring everything.
 - One role at a time: finish mapping the flow for one role before switching.
 
-## 5. Extract and discard
+## 5. Extract, verify, and discard
 
-The moment you identify the element for a step, write its **stable locator**
-(`getByRole` / `getByLabel` / text) into `cases.md` and move on. Do not keep the snapshot
-content in working context after you've extracted what you need — the YAML stays on disk
-if you need to grep it again.
+The moment you identify the element for a step, lock in its **stable locator** and write it
+into `cases.md`, then move on. Do not keep the snapshot content in working context after
+you've extracted what you need — the YAML stays on disk if you need to grep it again.
+
+**Never hand-transcribe a locator from the snapshot YAML.** Eyeballing the tree is exactly
+how unstable selectors (class / position) leak into `cases.md`. For every element you will
+reference in a step or assertion, resolve the locator **against the live element** and write
+*that* verified value:
+
+```
+npx playwright-cli generate-locator <ref> --raw
+```
+
+`generate-locator` returns Playwright's canonical locator using the same priority order Phase
+B enforces (`getByRole` > `getByLabel` > `getByText` > … > CSS as last resort — see
+`@.claude/rules/phase-b-generate.md`). Verifying with it *is* aligning with the rule; write
+its output verbatim into the step/assertion's `locator:` line.
+
+**Stability gate — do not silently write a fragile locator.** If `generate-locator` returns a
+prohibition-list shape (a CSS class, `:nth-child`, an xpath, or a bare `locator('...')`), the
+element has no stable handle. Then:
+
+1. Try a test id: `npx playwright-cli eval "el => el.getAttribute('data-testid')" <ref>` (same
+   check as section 7). If present, use `getByTestId('<value>')`.
+2. Still nothing → **stop and ask the user** (Clarification Protocol), or, if continuing, mark
+   that `locator:` line in `cases.md` as fragile explicitly (e.g. `locator: page.locator('.x')  # ⚠ 脆弱：無 role/name/testid`).
+   **Never write the fragile locator silently** — Phase B would otherwise reject it and bounce
+   the whole `cases.md` back.
 
 ## 6. Tool choice summary
 
 | Need                                  | Use                                            | Avoid                          |
 | ------------------------------------- | ---------------------------------------------- | ------------------------------ |
 | Find the next actionable element      | `snapshot -i` + `Grep`                         | full `snapshot` + `Read`       |
+| Lock in a step's `cases.md` locator   | `generate-locator <ref> --raw` (+ `eval` for testid) | hand-copying `getByRole(...)` from YAML; writing class / `nth-child` |
 | Confirm an assertion's static text    | full `snapshot` + `Grep` for that text         | reading the whole tree         |
 | Read around a matched line            | `Read` with a small `view_range` / `sed -n`    | `Read` the entire file         |
 | Verify visual state                   | (not needed — never screenshot, see Rule 3)    | `playwright-cli screenshot`    |

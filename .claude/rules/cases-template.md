@@ -51,6 +51,7 @@ patterns:
 - Sections must appear in this exact order: `Precondition` → `Steps` → `Assertions` → `Cleanup`
 - Do **not** add `Expected Result` or `Acceptance Criteria` sections
 - `locator:` lines are indented **3 spaces** under the step or bullet they belong to
+- Every `locator:` value must be a **verified** locator — produced by `generate-locator <ref> --raw` against the live element (or a `getByTestId` confirmed via `eval`), never hand-copied from the snapshot YAML. A fragile locator (class / `nth-child` / xpath) must not be written silently; see `@.claude/rules/phase-a-explore.md` Rule 5 (stability gate).
 - Steps or assertions that have no locator (e.g. URL navigations, URL checks) omit the `locator:` line entirely — do not write `locator: N/A`
 - TC title format: `## TC-{NNN}: {動詞}+{受詞}+{預期結果}` — the title alone must convey what property is being validated
 - Each TC block ends with `---`
