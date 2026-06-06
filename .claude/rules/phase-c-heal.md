@@ -1,17 +1,46 @@
-# Phase D — Heal Rules
+# Phase C — Heal (the opt-in heal tail of Phase C)
 
-Phase D repairs a session's failing tests **without ever masking a regression**.
-Flow-Guard is a regression guard: a failing test is a *signal*, and the healer's job
-is to tell whether that signal is "the test drifted" (fix it) or "the app broke"
-(keep it red and flag it loudly).
+Heal is the **opt-in tail of Phase C**. After the mandatory functional run + flake gate,
+when `heal:` is enabled it repairs the session's failing tests **without ever masking a
+regression**. Flow-Guard is a regression guard: a failing test is a *signal*, and the
+healer's job is to tell whether that signal is "the test drifted" (fix it) or "the app
+broke" (keep it red and flag it loudly).
 
 ---
 
-## The only two edits Phase D may write to `spec.ts`
+## When the heal tail runs (gate)
+
+- The heal tail (everything in this file) runs **only when `heal:` is true** (`/test heal:true`,
+  the `/heal` alias, or `/run` with `heal:`/`AUTO_HEAL`). With `heal: false`, Phase C stops at
+  the pass/fail + flake-gate report and performs **no classification** — the CLI re-open
+  (login + locale switch + navigate) is Phase A-level token cost and is not paid on every run.
+- Pre-conditions for the tail: at least one TC **failed**, and the failures are not **all**
+  auth-related (all-auth → defer to `/reauth`, no heal).
+- The `/heal` alias may **skip the initial functional run** when this session already has a
+  prior Phase C result (`test-results/` JUnit + traces) — it then consumes those existing
+  results instead of re-running the whole suite. If no prior result exists, it runs the
+  functional run first like `/test`.
+
+---
+
+## Ordering inside Phase C (where heal sits)
+
+```
+functional run → flake gate (on PASSED) → [heal: on] classify failures
+  → apply allowed edits → heal-verify 3× (patched only)
+  → FINAL flake gate 3× on ALL now-passing TCs   ← the gate is the final gatekeeper
+```
+
+The **final** flake gate after heal is non-negotiable: a TC that only passed *at the moment*
+it was edited must still prove 3/3 before it counts green. See `@.claude/rules/flake-gate.md`.
+
+---
+
+## The only two edits the heal tail may write to `spec.ts`
 
 1. **Selector re-resolution** — replace a drifted locator with a stable locator
    (`getByRole` / `getByLabel` / `getByPlaceholder` / `data-testid`), resolved against
-   a **fresh** snapshot YAML captured in this Phase D run.
+   a **fresh** snapshot YAML captured in this heal run.
 2. **Wait adjustment** — apply a deterministic wait per `@.claude/rules/dynamic-waits.md`
    when an element provably appears but later than the current wait allows.
 

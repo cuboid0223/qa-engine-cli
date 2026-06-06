@@ -62,9 +62,9 @@ patterns:
 - Every expected value is **observed-only**: it must be what Phase A actually saw on the target, never an unobserved claim copied from a spec.
 
 **Oracle rules (enforced):**
-- Every assertion bullet ends with an oracle tag — **`[prd]`** or **`[baseline]`** — placed after the description, before its `locator:` line. The tag is the only oracle marker; there is **no** TC-level oracle field (rollups are computed at report time, e.g. Phase E promote).
+- Every assertion bullet ends with an oracle tag — **`[prd]`** or **`[baseline]`** — placed after the description, before its `locator:` line. The tag is the only oracle marker; there is **no** TC-level oracle field (rollups are computed at report time, e.g. Phase D promote).
 - **`[prd]`** — the observed behavior is backed by `docs:` (the spec says this is correct). Carries correctness weight.
-- **`[baseline]`** — `docs:` is silent on this behavior. It is a characterization snapshot: it only guarantees the behavior has not changed, not that it is correct. Approving it as correct happens at `/promote` (see `@.claude/rules/phase-e-promote.md`).
+- **`[baseline]`** — `docs:` is silent on this behavior. It is a characterization snapshot: it only guarantees the behavior has not changed, not that it is correct. Approving it as correct happens at `/promote` (see `@.claude/rules/phase-d-promote.md`).
 - **No `docs:` provided → every assertion is `[baseline]`.** Never tag `[prd]` without a spec statement to back it.
 - **Conflict** (`docs:` says X but the target does Y): write the observed Y, tag it `[baseline ⚠ PRD 不符：PRD 寫 X]`. A conflict is a `[baseline]` variant (no separate enum value) and **never blocks Phase A** — it is surfaced for the human at review / promote.
 

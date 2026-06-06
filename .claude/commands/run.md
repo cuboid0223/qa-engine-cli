@@ -1,11 +1,11 @@
 ---
 name: run
-description: Full run — Phase A + B + C in sequence, plus Phase D (heal) when enabled. Plan, generate spec.ts, run tests, show report, optionally self-heal failures.
+description: Full run — Phase A + B + C in sequence. Plan, generate spec.ts, run tests + flake gate, show report, and optionally self-heal failures (Phase C heal tail) when enabled.
 ---
 
 # /run — Full Run: Plan + Generate + Test (+ Heal)
 
-Runs the phases in sequence with a mandatory human review pause between Phase A and Phase B. Phase D runs only when `heal:` is enabled.
+Runs the phases in sequence with a mandatory human review pause between Phase A and Phase B. The Phase C heal tail runs only when `heal:` is enabled.
 
 ---
 
@@ -14,7 +14,8 @@ Runs the phases in sequence with a mandatory human review pause between Phase A 
 ```
 target: <url>
 docs: <url>      # optional — PRD / spec, used ONLY as an oracle (tag [prd]/[baseline] + flag conflicts)
-heal: false      # optional — auto-run Phase D on failures; default false (or process.env.AUTO_HEAL)
+heal: false      # optional — run the Phase C heal tail on failures; default false (or process.env.AUTO_HEAL)
+gate: true       # optional — run the Phase C flake gate; default true (false skips for fast local iteration)
 ```
 
 ---
@@ -34,21 +35,19 @@ heal: false      # optional — auto-run Phase D on failures; default false (or 
 
 3. **Phase B** — Execute all steps from `/generate`. Generate `flow.spec.ts` and the session `playwright.config.ts` from `cases.md`.
 
-4. **Phase C** — Execute all steps from `/test`. Smoke-check auth, then run:
+4. **Phase C** — Execute all steps from `/test`, passing through `heal:` and `gate:`. Phase C always smoke-checks auth, runs the functional pass, and flake-gates the passing TCs:
    ```
    npx playwright test --config tests/generated/<ts>/playwright.config.ts
    ```
-   Show the results summary.
+   Then, **if any TC failed AND (`heal:` is true OR `process.env.AUTO_HEAL === 'true'`)**, the Phase C **heal tail** runs once per `@.claude/rules/phase-c-heal.md` and the report combines run results + heal actions. If `heal:` is false / unset, the heal tail is skipped and the run ends at the Phase C summary.
 
-5. **Phase D (conditional)** — After Phase C, **if any TC failed AND (`heal:` is true OR `process.env.AUTO_HEAL === 'true'`)**, run Phase D once per `@.claude/rules/phase-d-heal.md`, then emit a combined report (Phase C results + heal actions).
-
-   - **Non-interactive override (auto mode only):** the healer must NOT block. Any case that `phase-d-heal.md` would "STOP & ASK" on (ambiguous DRIFT vs REGRESSION) is instead classified **REGRESSION** and flagged.
-   - Phase D runs **at most once** inside `/run` — never loop.
-   - If `heal:` is false / unset, skip Phase D entirely; the run ends at the Phase C summary.
+   - **Non-interactive override (auto mode only):** the heal tail must NOT block. Any case that `phase-c-heal.md` would "STOP & ASK" on (ambiguous DRIFT vs REGRESSION) is instead classified **REGRESSION** and flagged.
+   - The heal tail runs **at most once** inside `/run` — never loop.
 
 ---
 
 ## Notes
 
 - A combined report with any flagged **REGRESSION** is never reported as green — name every flagged regression explicitly.
-- Phase D edits `spec.ts` in place (selector / wait only) and writes `tests/generated/<ts>/heal-<HHMMSS>.patch`. Review before committing.
+- The heal tail edits `spec.ts` in place (selector / wait only) and writes `tests/generated/<ts>/heal-<HHMMSS>.patch`. Review before committing.
+- **Promote is never part of `/run`** — declaring a build's behavior the correct baseline is always a deliberate, manual `/promote` (Phase D).

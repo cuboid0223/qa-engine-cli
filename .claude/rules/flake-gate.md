@@ -1,4 +1,4 @@
-# Flake Gate (shared by Phase C and Phase E)
+# Flake Gate (shared by Phase C and Phase D)
 
 A test that passes once is not proven stable — it may be flaky and pass by luck. The
 flake gate runs the **passing** tests repeatedly with retries disabled; only a test that
@@ -23,9 +23,10 @@ A TC is **stable** iff it passes 3/3. Anything less (e.g. 2/3) is **flaky**.
 
 ---
 
-## Phase C — two stages
+## Phase C — stages
 
-Phase C runs in two stages so cost is added only where it buys information:
+Phase C adds cost only where it buys information. The first two stages always run; the
+heal tail and its final gate run only when `heal:` is enabled (see `@.claude/rules/phase-c-heal.md`):
 
 **Stage 1 — functional run** (normal, with the config's retries):
 ```
@@ -36,8 +37,14 @@ Parse the JUnit result into PASSED and FAILED sets.
 **Stage 2 — flake gate** (default on; skip only when `gate: false`):
 Run the gate command above, grepping for the **PASSED** TC ids only. Do **not** re-run
 FAILED tests here — a consistently failing test is already not green, and a flaky-failing
-one is Phase D's job (`/heal` re-runs with its own repeat). Any PASSED TC that does not go
+one is the heal tail's job (it re-runs with its own repeat). Any PASSED TC that does not go
 3/3 is reclassified PASSED → **FLAKY (quarantined)**.
+
+**Stage 3 — heal tail + final gate** (`heal:` enabled only): the heal tail classifies the
+FAILED set, applies the allowed selector/wait edits, and heal-verifies each patched TC 3×.
+Then a **final flake gate** runs over **all now-passing TCs** (natively-passed + healed) —
+a healed TC must clear 3/3 here, not just at the moment it was edited. A TC that fails the
+final gate is quarantined or reclassified per `@.claude/rules/phase-c-heal.md`.
 
 **Final classification:** `STABLE` (3/3) · `FAILED` · `FLAKY`.
 
@@ -64,7 +71,7 @@ would mask the problem). It records instability for the user to fix.
 
 - A run is **fully green** only if `FAILED = 0` **and** `FLAKY = 0`.
 - Phase C never reports a run with flaky TCs as green — it lists each quarantined TC.
-- **Phase E (`/promote`) requires fully green.** If `quarantine.md` is non-empty (or any
+- **Phase D (`/promote`) requires fully green.** If `quarantine.md` is non-empty (or any
   TC is FAILED), promotion is aborted — a flaky test must never enter the committed
   `tests/e2e/` suite. Fix or stabilize the TC in the session first, then re-gate.
 
@@ -73,5 +80,5 @@ would mask the problem). It records instability for the user to fix.
 ## Cost control
 
 - Stage 2 gates only the PASSED set, never the FAILED set.
-- `gate: false` (input param) skips Stage 2 for fast local iteration — but Phase E always
+- `gate: false` (input param) skips Stage 2 for fast local iteration — but Phase D always
   runs the gate regardless, so an ungated session can still be caught at promote.

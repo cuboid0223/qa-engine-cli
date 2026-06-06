@@ -1,11 +1,11 @@
 ---
 name: promote
-description: Phase E — Promote. Flake-gate an approved session and copy it into the committed tests/e2e/ regression suite. Only promotes a 3/3-green flow; never promotes a failing or flaky one.
+description: Phase D — Promote. Flake-gate an approved session and copy it into the committed tests/e2e/ regression suite. Only promotes a 3/3-green flow; never promotes a failing or flaky one.
 argument-hint: "[folder]   # tests/generated/<timestamp>; omit to use the latest session"
 allowed-tools: Bash, Read, Edit, Glob, Grep
 ---
 
-# /promote — Phase E: Promote to the committed regression suite
+# /promote — Phase D: Promote to the committed regression suite
 
 Move an approved, green, non-flaky session out of the ephemeral `tests/generated/`
 (gitignored) into the version-controlled `tests/e2e/` suite. This is what makes
@@ -16,7 +16,7 @@ suite is re-run later to catch behavior changes.
 
 Acknowledge with one line: `promote session: tests/generated/<timestamp>`, then begin.
 
-Follow `@.claude/rules/phase-e-promote.md` exactly.
+Follow `@.claude/rules/phase-d-promote.md` exactly.
 
 ---
 
@@ -43,7 +43,7 @@ Stop and use the Clarification Protocol if any fails — do not promote.
    If any run fails or flakes, **abort promotion** and report which TC was unstable.
    A flaky test must never enter the committed suite.
 
-2. **Resolve the flow slug** from the `# Flow:` heading per `@.claude/rules/phase-e-promote.md`.
+2. **Resolve the flow slug** from the `# Flow:` heading per `@.claude/rules/phase-d-promote.md`.
    If `tests/e2e/<slug>/` already exists, this is an **update (re-promotion)** — proceed,
    and note that `git diff` will show exactly what validated behavior changed.
 
@@ -61,7 +61,12 @@ Stop and use the Clarification Protocol if any fails — do not promote.
 6. **Ensure `.gitignore`** contains `tests/e2e/*/.auth/` (commit specs + cases, never auth state).
 
 7. **Report.** What was promoted, new-flow vs update, the flake-gate result (3/3), and a
-   reminder to commit. For an update, print a 1-line summary of the cases.md diff.
+   reminder to commit. Surface for human sign-off (per `@.claude/rules/phase-d-promote.md`):
+   - every `[baseline]` assertion + every conflict (`[baseline ⚠ PRD 不符：…]`), with the line
+     **「按下 promote = 你宣告以下 baseline 現狀為正確基準」**;
+   - **every locator/wait the Phase C heal tail changed** in this session (TC id + `old → new`,
+     read from the session's `heal-<HHMMSS>.patch`); if no patch exists, print `（本 session 未經 heal）`.
+   For an update, also print a 1-line summary of the cases.md diff (flag `[prd]`/`[baseline]` line diffs).
 
 ---
 

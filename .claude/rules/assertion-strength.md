@@ -77,5 +77,5 @@ value originates from the app's response, never the literal input).
   If a TC's assertions are all on the prohibition list, **stop and name the TC** — tell the
   user which TC in `cases.md` needs a real outcome assertion. Phase B must not invent one
   (assertions come from `cases.md`), and must not weaken or pad assertions to pass.
-- **Phase E (promote)** inherits this: a flow that reached green already passed Phase B's
+- **Phase D (promote)** inherits this: a flow that reached green already passed Phase B's
   assertion check, so no weak-assertion flow enters the committed suite.

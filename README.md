@@ -2,7 +2,7 @@
 
 AI 驅動的 QA 測試系統，透過 **Claude Code** 與 `npx playwright-cli`，對 web 應用執行系統性流程驗證。
 
-**核心定位**：regression guard，不是 bug finder。五階段 workflow（Plan → Generate → Test → Heal → Promote），每階段產出獨立可稽核的檔案，中間可人工介入；只有通過 flake gate、被人工核可的 flow 才會 promote 進版控的 `tests/e2e/` 套件，成為持久的回歸基準。
+**核心定位**：regression guard，不是 bug finder。四階段 workflow（Plan → Generate → Test+Heal → Promote），每階段產出獨立可稽核的檔案，中間可人工介入；只有通過 flake gate、被人工核可的 flow 才會 promote 進版控的 `tests/e2e/` 套件，成為持久的回歸基準。Heal 是 Phase C 的選用 tail（`heal:` 開才跑），不是獨立階段。
 
 ---
 
@@ -12,7 +12,7 @@ AI 驅動的 QA 測試系統，透過 **Claude Code** 與 `npx playwright-cli`�
 Claude Code
     ↕ slash commands (/plan /generate /test /heal /run /reauth /promote)
  Flow-Guard (defined in CLAUDE.md)
-    ↕ Bash (Phase A / Phase D explore)
+    ↕ Bash (Phase A / Phase C heal explore)
 npx playwright-cli
     ↕
   Browser
@@ -29,7 +29,7 @@ tsso-setup  →  mock-user-setup  →  chrome | chrome-<role>
 
 ---
 
-## 五階段 Workflow
+## 四階段 Workflow
 
 ```mermaid
 flowchart LR
@@ -37,7 +37,7 @@ flowchart LR
 
     User -->|"/plan or /run"| A
     subgraph A["Phase A — Plan"]
-        A1["playwright-cli 探索（snapshot -i + grep，省 token）\n+ 讀 source / docs"]
+        A1["playwright-cli 探索（snapshot -i + grep，省 token）\n+ 讀 docs（oracle）"]
         A1 --> A2["cases.md（人可讀、可編輯）"]
     end
 
@@ -47,39 +47,34 @@ flowchart LR
         B1 --> B2["flow.spec.ts + session playwright.config.ts"]
     end
 
-    B2 -->|"/test"| C
-    subgraph C["Phase C — Test"]
+    B2 -->|"/test（可加 heal:）"| C
+    subgraph C["Phase C — Test + Heal"]
         C1["Stage 1 功能跑（--config）"]
         C1 --> C2["Stage 2 flake gate\n(--repeat-each=3 --retries=0)"]
         C2 --> C3["STABLE / FAILED / FLAKY(quarantine)"]
+        C3 -.->|"heal: 開且有失敗"| C4["heal tail：分類 DRIFT/REGRESSION/FLAKE\n只修 selector/wait；regression flag\n→ 最終 flake gate"]
     end
 
-    C3 -->|"有失敗時 /heal"| D
-    subgraph D["Phase D — Heal"]
-        D1["分類失敗：DRIFT / REGRESSION / FLAKE"]
-        D1 --> D2["只修 selector / wait；regression 一律 flag"]
-    end
-
-    C3 -->|"全綠且人工核可後 /promote"| E
-    subgraph E["Phase E — Promote"]
-        E1["flake gate 3/3 → 複製進 committed tests/e2e/"]
+    C3 -->|"全綠且人工核可後 /promote"| D
+    C4 -.-> D
+    subgraph D["Phase D — Promote"]
+        D1["flake gate 3/3 → 複製進 committed tests/e2e/"]
     end
 
     User -->|"/reauth"| R1
     R1["強制刷新 tsso-base.json"]
 ```
 
-| Phase        | 指令          | 輸入                                        | 輸出                                                |
-| ------------ | ----------- | ----------------------------------------- | ------------------------------------------------- |
-| A — Plan     | `/plan`     | target + (docs) + (locale)                | `cases.md`                                        |
-| B — Generate | `/generate` | `cases.md`                                | `flow.spec.ts` + session `playwright.config.ts`   |
-| C — Test     | `/test`     | `flow.spec.ts`                            | HTML report + JUnit + (quarantine.md)             |
-| D — Heal     | `/heal`     | Phase C 失敗結果                            | 修好的 spec.ts + heal 報告 + `.patch`              |
-| E — Promote  | `/promote`  | 全綠的 session                             | `tests/e2e/<slug>/`（committed 回歸套件）           |
-| 全流程        | `/run`      | 同 /plan（可加 `heal:` / `gate:`）          | A→B→C（+D if heal）                                |
-| 重新登入      | `/reauth`   | `.env` 憑證                                | `playwright/.auth/tsso-base.json`                 |
+| Phase            | 指令          | 輸入                                        | 輸出                                                |
+| ---------------- | ----------- | ----------------------------------------- | ------------------------------------------------- |
+| A — Plan         | `/plan`     | target + (docs) + (locale)                | `cases.md`                                        |
+| B — Generate     | `/generate` | `cases.md`                                | `flow.spec.ts` + session `playwright.config.ts`   |
+| C — Test + Heal  | `/test`、`/heal` | `flow.spec.ts`（heal tail 吃 Phase C 失敗結果） | HTML report + JUnit + (quarantine.md) +（heal 開）修好的 spec.ts + `.patch` |
+| D — Promote      | `/promote`  | 全綠的 session                             | `tests/e2e/<slug>/`（committed 回歸套件）           |
+| 全流程            | `/run`      | 同 /plan（可加 `heal:` / `gate:`）          | A→B→C（C 內含 heal tail if heal）                  |
+| 重新登入          | `/reauth`   | `.env` 憑證                                | `playwright/.auth/tsso-base.json`                 |
 
-**為什麼分階段**：每階段單一職責、中間產物可審查可重跑。Heal 與 Promote 都獨立成階段，讓「修測試」「把這版行為簽成正確基準」這兩件事永遠在人能看見的邊界內進行。
+**為什麼分階段**：每階段單一職責、中間產物可審查可重跑。Heal 是 Phase C 的選用 tail，Promote 自成一階段，讓「修測試」「把這版行為簽成正確基準」這兩件事永遠在人能看見的邊界內進行。
 
 ---
 
@@ -103,10 +98,12 @@ docs: ./prd.md           # optional — PRD / spec，僅作 oracle（貼 [prd]/[
 
 讀 `cases.md` 產生 `flow.spec.ts` 與 session `playwright.config.ts`（factory 呼叫）。會把 refs 轉成穩定 selector，並驗證每個 TC 的 **Cleanup** 欄位與 **outcome 斷言**（套套邏輯會被擋下並點名）。
 
-### `/test` — Phase C：兩階段跑測試
+### `/test` — Phase C：跑測試 + flake gate（+ 選用 heal）
 
 ```
 /test <folder>
+heal: false      # optional — 有失敗時跑 heal tail（預設 false / AUTO_HEAL）
+gate: true       # optional — 跑 flake gate（預設 true）
 ```
 ```
 # Stage 1 功能跑
@@ -115,17 +112,17 @@ npx playwright test --config tests/generated/<ts>/playwright.config.ts
 npx playwright test --config tests/generated/<ts>/playwright.config.ts --repeat-each=3 --retries=0 --grep "<passed TCs>"
 ```
 
-setup chain 依序 `tsso-setup → mock-user-setup → chrome[-role]`。結果分類為 **STABLE / FAILED / FLAKY**；flaky 寫進 `quarantine.md`，**不算綠**。完整 trace：`npx playwright show-report`。
+setup chain 依序 `tsso-setup → mock-user-setup → chrome[-role]`。結果分類為 **STABLE / FAILED / FLAKY**；flaky 寫進 `quarantine.md`，**不算綠**。完整 trace：`npx playwright show-report`。`heal:` 開且有失敗時，接著跑 heal tail（見下）；`heal: false` 時只報 pass/fail，不做 CLI 重開分類。
 
-### `/heal` — Phase D：分類失敗 → 修漂移、flag regression
+### `/heal` — Phase C（heal 模式，= `/test heal:true`）：分類失敗 → 修漂移、flag regression
 
 ```
 /heal <folder>
 ```
 
-讀 `test-results/`，先用 `playwright-cli` 重新探索拿 fresh snapshot，再把失敗分類：**DRIFT**（重解 selector）、**FLAKE**（只調等待）、**REGRESSION / TEST-DEFECT / AUTH**（不改、直接 flag）。修過的以 `--repeat-each=3` 重跑 3/3 才算修好。**絕不修改斷言、不加 skip/sleep 逼綠燈。**
+Phase C 的選用 tail，不是獨立階段。若本 session 已有 Phase C 結果（`test-results/` JUnit+trace）會**跳過初跑**直接吃既有結果；否則先跑一次。讀 `test-results/`，先用 `playwright-cli` 重新探索拿 fresh snapshot，再把失敗分類：**DRIFT**（重解 selector）、**FLAKE**（只調等待）、**REGRESSION / TEST-DEFECT / AUTH**（不改、直接 flag）。修過的以 `--repeat-each=3` 重跑 3/3 才算修好，最後對所有 pass TC 再過一次完整 flake gate。**絕不修改斷言、不加 skip/sleep 逼綠燈。**
 
-### `/promote` — Phase E：flake gate → 進 committed 套件
+### `/promote` — Phase D：flake gate → 進 committed 套件
 
 ```
 /promote <folder>
@@ -139,11 +136,11 @@ setup chain 依序 `tsso-setup → mock-user-setup → chrome[-role]`。結果�
 /run
 target: http://localhost:3000
 docs: ./prd.md
-heal: true            # optional — Phase C 有失敗時自動接 Phase D（預設 false）
+heal: true            # optional — Phase C 有失敗時自動跑 heal tail（預設 false）
 gate: true            # optional — 跑 Phase C flake gate（預設 true；false 給快速迭代）
 ```
 
-依序 A → B → C（`heal:` 開則 C 後自動 D）。**Promote 永遠手動**，不納入 `/run`——把某版行為簽成正確基準應由人決定。
+依序 A → B → C（`heal:` 開則 C 內含 heal tail）。**Promote 永遠手動**，不納入 `/run`——把某版行為簽成正確基準應由人決定。
 
 ### `/reauth` — 重新整理登入狀態
 
@@ -158,7 +155,7 @@ gate: true            # optional — 跑 Phase C flake gate（預設 true；fals
 | `target` | 是  | 測試目標 URL（亦可由 `TARGET_URL` 提供）                 |
 | `docs`   | 否  | PRD / spec 的 URL 或本地路徑——**僅作 oracle**：替觀察到的斷言貼 `[prd]`/`[baseline]` 標籤、flag 衝突，不作為斷言來源 |
 | `locale` | 否  | 瀏覽器語系（預設 `zh-TW`）                             |
-| `heal`   | 否  | `/run`：失敗時自動跑 Phase D（預設 false / `AUTO_HEAL`） |
+| `heal`   | 否  | `/test`、`/run`：失敗時跑 Phase C heal tail（預設 false / `AUTO_HEAL`） |
 | `gate`   | 否  | `/test` `/run`：跑 Phase C flake gate（預設 true）  |
 
 > **沒有 `source` 參數。** Flow-Guard 是 regression guard：它只把 target 上**實際觀察到**的行為寫成斷言（observed-only），所以 `cases.md` 永遠對得上畫面。cleanup endpoint 由 Phase A 觀察建立資料時送出的網路請求取得（`playwright-cli requests`），不讀原始碼。
@@ -195,7 +192,7 @@ AUTO_HEAL=false                    # optional — /run 預設是否自動 heal
 
 ```
 qa-engine/
-├── CLAUDE.md                     ← Flow-Guard 核心定義（五階段）
+├── CLAUDE.md                     ← Flow-Guard 核心定義（四階段）
 ├── playwright.config.ts          ← 唯讀 resolver（指向最新 session，勿手改／勿被寫入）
 ├── playwright.config.base.ts     ← 人工維護的 factory（createSessionConfig）
 ├── package.json
@@ -207,8 +204,8 @@ qa-engine/
 │   │   ├── plan.md
 │   │   ├── generate.md
 │   │   ├── test.md
-│   │   ├── heal.md               ← /heal（Phase D）
-│   │   ├── promote.md            ← /promote（Phase E）
+│   │   ├── heal.md               ← /heal（Phase C 的 heal 模式 alias）
+│   │   ├── promote.md            ← /promote（Phase D）
 │   │   ├── run.md
 │   │   └── reauth.md
 │   └── rules/
@@ -219,9 +216,9 @@ qa-engine/
 │       ├── pattern-annotation.md
 │       ├── dynamic-waits.md
 │       ├── test-data-cleanup.md  ← 依 Cleanup 欄位生成 teardown
-│       ├── flake-gate.md         ← Phase C / E 共用 flake gate
-│       ├── phase-d-heal.md       ← Heal 決策樹
-│       └── phase-e-promote.md    ← Promote（slug / copy / provenance）
+│       ├── flake-gate.md         ← Phase C / D 共用 flake gate
+│       ├── phase-c-heal.md       ← Heal 決策樹（Phase C heal tail）
+│       └── phase-d-promote.md    ← Promote（slug / copy / provenance）
 │
 ├── playwright/
 │   ├── setup/
@@ -238,10 +235,10 @@ qa-engine/
 │   │       ├── mock-user.setup.ts
 │   │       ├── mock-users.json
 │   │       ├── quarantine.md               ← flaky TC（若有）
-│   │       ├── heal-<HHMMSS>.patch         ← Phase D（若有）
+│   │       ├── heal-<HHMMSS>.patch         ← Phase C heal tail（若有）
 │   │       └── .auth/state*.json
 │   │
-│   └── e2e/                      ← Phase E promote（committed 回歸套件）
+│   └── e2e/                      ← Phase D promote（committed 回歸套件）
 │       └── <slug>/
 │           ├── cases.md                    ← 行為契約 / 基準
 │           ├── flow*.spec.ts
@@ -278,7 +275,7 @@ npx playwright test --config tests/e2e/leave-request/playwright.config.ts
 ## 生命週期
 
 ```
-/run（A→B→C，選擇性 D heal）→ 產生候選
+/run（A→B→C，C 含選用 heal tail）→ 產生候選
         ↓ 人工審查
 /promote → flake gate 3/3 → 進版控 tests/e2e/
         ↓

@@ -1,4 +1,4 @@
-# Phase E — Promote Rules
+# Phase D — Promote Rules
 
 Promotion turns an approved session into a permanent, version-controlled regression
 test. The committed `tests/e2e/` suite is the only thing that gives Flow-Guard a real
@@ -97,6 +97,22 @@ characterization.
   unresolved conflicts — surface them and let the human decide. Conflicts are **surfaced,
   not blocking**: a `⚠` does not abort promotion (the flake gate is the only hard gate),
   but it must be shown so the human knows the spec and the app disagree on that assertion.
+
+## Heal-touched locators (sign-off)
+
+A session may have reached green only because Phase C's heal tail re-resolved a drifted
+locator (or adjusted a wait). The committed spec then carries those healed selectors as the
+new baseline, so promotion is also the moment a human blesses them — same spirit as the
+`[baseline]` sign-off above.
+
+- **The promote report must list every locator/wait the heal tail changed in this session**
+  (TC id + `old → new`), in its own prominent section alongside the `[baseline]` list.
+  Source: the session's `heal-<HHMMSS>.patch` file(s) (the unified diff Phase C's heal tail
+  writes). If no `heal-*.patch` exists, the session reached green natively — print
+  `（本 session 未經 heal）` and skip the section.
+- These are **surfaced, not blocking** (the flake gate is the only hard gate): a healed
+  locator that passed the final 3/3 gate is promotable, but the human must see *which*
+  selectors were auto-rewritten before declaring this the baseline.
 
 ## Re-promotion (update) semantics
 
